@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#2D7D52" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>حضور الحلقات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Noto+Kufi+Arabic:wght@700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<!-- QR Code generator (لا يحتاج اتصال بالإنترنت بعد التحميل الأول) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+<div id="pinScreen" class="screen-overlay">
+  <div class="pin-card">
+    <div class="pin-logo">
+      <div class="pin-org-logos" id="pinOrgLogos"></div>
+      <div class="pin-logo-icon" id="pinLogoIcon">📚</div>
+      <h1 class="pin-title" id="pinTitle">حضور الحلقات</h1>
+      <p class="pin-sub" id="pinSubtitle">نظام إدارة الحضور والغياب</p>
+    </div>
+    <div class="pin-display" id="pinDisplay">
+      <span class="pin-dot" id="d1"></span>
+      <span class="pin-dot" id="d2"></span>
+      <span class="pin-dot" id="d3"></span>
+      <span class="pin-dot" id="d4"></span>
+    </div>
+    <p class="pin-label">أدخل الرمز السري للمتابعة</p>
+    <p class="pin-keyboard-hint">⌨️ يمكنك الكتابة مباشرة من لوحة المفاتيح</p>
+    <div class="pin-keypad">
+      <button class="pin-key" onclick="pinPress(1)">1</button>
+      <button class="pin-key" onclick="pinPress(2)">2</button>
+      <button class="pin-key" onclick="pinPress(3)">3</button>
+      <button class="pin-key" onclick="pinPress(4)">4</button>
+      <button class="pin-key" onclick="pinPress(5)">5</button>
+      <button class="pin-key" onclick="pinPress(6)">6</button>
+      <button class="pin-key" onclick="pinPress(7)">7</button>
+      <button class="pin-key" onclick="pinPress(8)">8</button>
+      <button class="pin-key" onclick="pinPress(9)">9</button>
+      <button class="pin-key pin-key-clear" onclick="pinClear()">⌫</button>
+      <button class="pin-key" onclick="pinPress(0)">0</button>
+      <button class="pin-key pin-key-ok" onclick="pinSubmit()">دخول</button>
+    </div>
+    <p id="pinError" class="pin-error"></p>
+    <!-- QR رمز الشبكة -->
+    <div id="pinQrSection" style="margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0">
+      <p style="font-size:12px;color:#64748b;margin:0 0 10px">📱 امسح للدخول من هاتفك (نفس الشبكة)</p>
+      <div id="pinQrCanvas" style="display:inline-block;background:#fff;padding:6px;border-radius:8px;border:2px solid #e2e8f0"></div>
+      <p id="pinQrUrl" style="font-size:11px;color:#94a3b8;margin:6px 0 0;direction:ltr;font-family:monospace">جارٍ التحميل…</p>
+    </div>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+
+  <header class="app-header">
+    <button class="btn-icon menu-btn" onclick="toggleSidebar()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <span class="app-header-title" id="headerTitle">الرئيسية</span>
+    <div class="header-brand">
+      <div class="header-logos" id="headerLogos"></div>
+    </div>
+    <div class="header-right">
+      <button class="notif-bell-btn" id="notifBellBtn" onclick="toggleNotifPanel()" title="الإشعارات">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <span class="notif-badge hidden" id="notifBadge">0</span>
+      </button>
+      <span class="date-badge" id="todayBadge"></span>
+    </div>
+  </header>
+
+  <!-- Notification Panel -->
+  <div class="notif-overlay hidden" id="notifOverlay" onclick="closeNotifPanel()"></div>
+  <div class="notif-panel hidden" id="notifPanel">
+    <div class="notif-panel-header">
+      <span class="notif-panel-title">🔔 الإشعارات</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="notif-dismiss-all-btn" id="notifDismissAllBtn" onclick="dismissAllNotifs()">تجاهل الكل</button>
+        <button class="btn-icon" onclick="closeNotifPanel()">✕</button>
+      </div>
+    </div>
+    <div class="notif-panel-body" id="notifPanelBody">
+      <div class="notif-loading">⏳ جارٍ التحميل…</div>
+    </div>
+  </div>
+
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-logos" id="sidebarLogos"></div>
+        <span> حضور الحلقات</span>
+      </div>
+      <button class="btn-icon" onclick="closeSidebar()">✕</button>
+    </div>
+    <div class="sidebar-nav">
+      <a class="nav-item active" data-page="dashboard" onclick="navigate('dashboard')"><span class="nav-icon">🏠</span> الرئيسية</a>
+      <a class="nav-item" data-page="attendance" onclick="navigate('attendance')"><span class="nav-icon">✅</span> تسجيل الحضور</a>
+      <a class="nav-item" data-page="whatsapp"   onclick="navigate('whatsapp')"><span class="nav-icon">💬</span> واتساب <span id="waQueueBadge" class="wa-nav-badge hidden"></span></a>
+      <a class="nav-item" data-page="students" onclick="navigate('students')"><span class="nav-icon">👥</span> الطلاب</a>
+      <a class="nav-item" data-page="quran" onclick="navigate('quran')"><span class="nav-icon">📖</span> تقدم القرآن</a>
+      <a class="nav-item" data-page="classes" onclick="navigate('classes')"><span class="nav-icon">🏫</span> الحلقات</a>
+      <a class="nav-item" data-page="teachers" onclick="navigate('teachers')"><span class="nav-icon">👨‍🏫</span> المعلمون</a>
+      <a class="nav-item" data-page="checkin" onclick="navigate('checkin')"><span class="nav-icon">⏱</span> حضور المعلمين</a>
+      <a class="nav-item" data-page="holidays" onclick="navigate('holidays')"><span class="nav-icon">📅</span> الإجازات</a>
+      <a class="nav-item" data-page="calendar" onclick="navigate('calendar')"><span class="nav-icon">🗓️</span> التقويم</a>
+      <a class="nav-item" data-page="reports" onclick="navigate('reports')"><span class="nav-icon">📊</span> التقارير</a>
+      <a class="nav-item" data-page="sync" onclick="navigate('sync')"><span class="nav-icon">🔄</span> مزامنة / نسخ احتياطي</a>
+      <a class="nav-item" data-page="settings" onclick="navigate('settings')"><span class="nav-icon">⚙️</span> الإعدادات</a>
+    </div>
+    <div class="sidebar-footer">
+      <button class="btn-secondary w-full" onclick="lockApp()">🔒 قفل التطبيق</button>
+    </div>
+  </nav>
+
+  <main class="page-container">
+
+    <!-- الرئيسية -->
+    <div class="page" id="page-dashboard">
+      <div class="page-head">
+        <h2>الرئيسية</h2>
+        <p id="dashHolidayBanner" class="holiday-banner hidden"></p>
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card stat-blue">
+          <div class="stat-icon">👥</div>
+          <div class="stat-body"><div class="stat-num" id="stat-students">—</div><div class="stat-lbl">الطلاب</div></div>
+        </div>
+        <div class="stat-card stat-green">
+          <div class="stat-icon">✅</div>
+          <div class="stat-body"><div class="stat-num" id="stat-present">—</div><div class="stat-lbl">حاضرون</div></div>
+        </div>
+        <div class="stat-card stat-red">
+          <div class="stat-icon">❌</div>
+          <div class="stat-body"><div class="stat-num" id="stat-absent">—</div><div class="stat-lbl">غائبون</div></div>
+        </div>
+        <div class="stat-card stat-purple">
+          <div class="stat-icon">🏫</div>
+          <div class="stat-body"><div class="stat-num" id="stat-classes">—</div><div class="stat-lbl">الحلقات</div></div>
+        </div>
+        <div class="stat-card stat-orange">
+          <div class="stat-icon">👨‍🏫</div>
+          <div class="stat-body"><div class="stat-num" id="stat-teachers">—</div><div class="stat-lbl">المعلمون</div></div>
+        </div>
+        <div class="stat-card stat-teal">
+          <div class="stat-icon">⏱</div>
+          <div class="stat-body"><div class="stat-num" id="stat-teachersin">—</div><div class="stat-lbl">حاضرون الآن</div></div>
+        </div>
+      </div>
+      <div class="quick-actions">
+        <h3 class="section-title">إجراءات سريعة</h3>
+        <div class="action-grid">
+          <button class="action-btn" onclick="navigate('attendance')"><span class="action-icon">✅</span><span>تسجيل الحضور</span></button>
+          <button class="action-btn" onclick="navigate('checkin')"><span class="action-icon">⏱</span><span>حضور المعلم</span></button>
+          <button class="action-btn" onclick="navigate('reports')"><span class="action-icon">📊</span><span>التقارير</span></button>
+          <button class="action-btn" onclick="navigate('students')"><span class="action-icon">➕</span><span>إضافة طالب</span></button>
+        </div>
+      </div>
+
+      <!-- بطاقة QR الشبكة المحلية -->
+      <div class="dash-qr-card">
+        <div class="dash-qr-header">
+          <div>
+            <div class="dash-qr-title">📱 وصول سريع من الهاتف</div>
+            <div class="dash-qr-sub">امسح الرمز — على نفس شبكة WiFi</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button onclick="buildAllQRCodes()" class="dash-qr-btn">🔄</button>
+            <button onclick="copyNetworkLink()" class="dash-qr-btn dash-qr-btn-primary">🔗 نسخ</button>
+          </div>
+        </div>
+        <div class="dash-qr-body">
+          <div id="dashQrCanvas" class="dash-qr-canvas"></div>
+          <div id="dashQrUrl" class="dash-qr-url"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- تسجيل الحضور -->
+    <div class="page hidden" id="page-attendance">
+      <div class="page-head"><h2>تسجيل الحضور</h2></div>
+
+      <!-- اختيار التاريخ والحلقة -->
+      <div class="att-selector-card">
+        <div class="form-row">
+          <div class="form-group">
+            <label>التاريخ</label>
+            <input type="date" id="attDate" onchange="loadAttendanceClass();updateHijriLabel(this,'attDateHijri')" />
+            <span class="hijri-label" id="attDateHijri"></span>
+          </div>
+          <div class="form-group">
+            <label>الحلقة</label>
+            <select id="attClass" onchange="loadAttendanceStudents()">
+              <option value="">— اختر الحلقة —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div id="attHolidayNote" class="info-banner hidden"></div>
+
+      <!-- شريط تحديد الكل -->
+      <div class="att-action-row hidden" id="attMarkRow">
+        <div class="att-inline-counts">
+          <span class="att-count-chip att-count-p"><span class="att-count-num" id="attCountPresent">0</span> <span class="att-count-lbl">حاضر</span></span>
+          <span class="att-count-chip att-count-a"><span class="att-count-num" id="attCountAbsent">0</span> <span class="att-count-lbl">غائب</span></span>
+          <span class="att-count-chip att-count-l"><span class="att-count-num" id="attCountLate">0</span> <span class="att-count-lbl">متأخر</span></span>
+          <span class="att-count-chip att-count-e"><span class="att-count-num" id="attCountExcused">0</span> <span class="att-count-lbl">بعذر</span></span>
+        </div>
+        <div class="att-action-btns">
+          <button class="att-mark-btn att-mark-present" onclick="markAll('Present')">✅ الكل حاضر</button>
+          <button class="att-mark-btn att-mark-absent"  onclick="markAll('Absent')">❌ الكل غائب</button>
+          <button class="att-mark-btn att-mark-leave"   onclick="openLeaveModal()">🏥 إذن مسبق</button>
+          <button class="btn-primary att-save-btn" onclick="saveAttendance()">💾 حفظ</button>
+        </div>
+      </div>
+
+      <!-- قائمة الطلاب -->
+      <div id="attStudentList" class="student-att-list"></div>
+
+      <!-- زر الحفظ السفلي -->
+      <div id="attSaveBottom" class="hidden" style="margin-top:12px;margin-bottom:8px">
+        <button class="btn-primary" style="width:100%;padding:14px;font-size:16px;border-radius:14px" onclick="saveAttendance()">💾 حفظ الحضور</button>
+      </div>
+
+      <!-- لوحة واتساب القديمة (تُستخدم للإرسال المباشر من الصفحة) -->
+      <div id="waNotifyPanel" class="wa-notify-panel hidden">
+        <div class="wa-notify-header">
+          <span>💬 إرسال إشعارات الغياب عبر واتساب</span>
+          <button class="btn-icon" onclick="document.getElementById('waNotifyPanel').classList.add('hidden')">✕</button>
+        </div>
+        <div id="waAbsentList" class="wa-absent-list"></div>
+        <div class="wa-notify-footer">
+          <button class="btn-secondary" onclick="document.getElementById('waNotifyPanel').classList.add('hidden')">إغلاق</button>
+          <button class="btn-primary wa-send-all-btn" id="waSendAllBtn" onclick="sendWhatsAppBulk()">📤 إرسال للجميع</button>
+        </div>
+        <p id="waSendStatus" class="status-msg" style="text-align:center;margin-top:8px"></p>
+      </div>
+    </div>
+
+    <!-- ══════════════════════════════════════
+         صفحة واتساب
+    ══════════════════════════════════════ -->
+    <div class="page hidden" id="page-whatsapp">
+      <div class="page-head"><h2>💬 واتساب</h2></div>
+
+      <!-- تبويبات الصفحة -->
+      <div class="wa-page-tabs">
+        <button class="wa-tab active" data-tab="queue"  onclick="waShowTab('queue')">
+          <span class="wa-tab-icon">📋</span> قائمة الانتظار
+          <span class="wa-queue-count hidden" id="waTabCount">0</span>
+        </button>
+        <button class="wa-tab" data-tab="send"   onclick="waShowTab('send')">
+          <span class="wa-tab-icon">✉️</span> رسالة جديدة
+        </button>
+        <button class="wa-tab" data-tab="groups" onclick="waShowTab('groups')">
+          <span class="wa-tab-icon">👥</span> المجموعات
+        </button>
+        <button class="wa-tab" data-tab="log"    onclick="waShowTab('log')">
+          <span class="wa-tab-icon">🕐</span> السجل
+        </button>
+      </div>
+
+      <!-- ▸ تبويب: قائمة الانتظار -->
+      <div class="wa-tab-panel" id="waTab-queue">
+        <div class="wa-queue-toolbar">
+          <div class="wa-queue-info" id="waQueueInfo">جارٍ التحميل…</div>
+          <div class="wa-queue-btns">
+            <button class="btn-secondary" onclick="waSelectAllQueue()">تحديد الكل</button>
+            <button class="btn-primary"   id="waSendQueueBtn" onclick="waSendSelected()" disabled>
+              📤 إرسال المحدد
+            </button>
+          </div>
+        </div>
+        <div id="waQueueList" class="wa-queue-list"></div>
+      </div>
+
+      <!-- ▸ تبويب: رسالة جديدة -->
+      <div class="wa-tab-panel hidden" id="waTab-send">
+
+        <!-- ─ إرسال لمجموعة واتساب ─ -->
+        <div class="wa-section-card wa-group-chat-card">
+          <div class="wa-section-label">
+            <span class="wa-section-icon">💬</span>
+            <span>إرسال لمجموعة واتساب (Group Chat)</span>
+          </div>
+          <p class="wa-section-desc">أدخل معرّف المجموعة كما يظهر في إعدادات Fonnte (مثال: <code><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="1d2c2f2d2e2b2e656565655d7a33686e">[email&#160;protected]</a></code>) وسيُرسَل لها رسالة واحدة مباشرة.</p>
+          <div class="wa-groupchat-fields">
+            <input type="text" id="waGroupChatId" class="wa-groupchat-input" placeholder="معرّف المجموعة: 120363xxxxxxxx@g.us" dir="ltr" />
+            <textarea id="waGroupChatMsg" class="wa-message-area" rows="3" placeholder="نص الرسالة للمجموعة…"></textarea>
+          </div>
+          <div class="wa-compose-footer">
+            <div class="wa-compose-status" id="waGroupChatStatus"></div>
+            <button class="btn-primary" id="waGroupChatSendBtn" onclick="waSendGroupChat()">
+              💬 إرسال للمجموعة
+            </button>
+          </div>
+        </div>
+
+        <div class="wa-section-divider"><span>أو إرسال لأفراد</span></div>
+
+        <!-- ─ إرسال لأفراد ─ -->
+        <div class="wa-compose-card">
+          <div class="wa-compose-section">
+            <div class="wa-compose-label">المستلمون</div>
+            <div class="wa-recipients-row">
+              <select id="waGroupPicker" class="wa-group-select" onchange="waPickGroup()">
+                <option value="">— اختر مجموعة جهات اتصال —</option>
+              </select>
+              <button class="wa-add-recipient-btn" onclick="waAddRecipientRow()">+ إضافة رقم</button>
+            </div>
+            <div id="waRecipientList" class="wa-recipient-list"></div>
+          </div>
+          <div class="wa-compose-section">
+            <div class="wa-compose-label">نص الرسالة</div>
+            <textarea id="waCustomMsg" class="wa-message-area" rows="5"
+              placeholder="اكتب رسالتك هنا…"></textarea>
+            <div class="wa-msg-hints">
+              يمكنك استخدام: <code>{اسم_الطالب}</code> <code>{الحلقة}</code> <code>{التاريخ}</code>
+            </div>
+          </div>
+          <div class="wa-compose-footer">
+            <div class="wa-compose-status" id="waCustomStatus"></div>
+            <button class="btn-primary" id="waSendCustomBtn" onclick="waSendCustom()">
+              📤 إرسال للأفراد
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ▸ تبويب: المجموعات -->
+      <div class="wa-tab-panel hidden" id="waTab-groups">
+        <div class="wa-groups-header">
+          <p class="section-desc">أنشئ مجموعات لإرسال رسائل جماعية بسرعة.</p>
+          <button class="btn-primary" onclick="waOpenNewGroup()">➕ مجموعة جديدة</button>
+        </div>
+        <div id="waGroupsList" class="wa-groups-list"></div>
+      </div>
+
+      <!-- ▸ تبويب: السجل -->
+      <div class="wa-tab-panel hidden" id="waTab-log">
+        <div class="wa-log-toolbar">
+          <div class="wa-log-filter">
+            <select id="waLogFilter" onchange="waRenderLog()">
+              <option value="">كل الرسائل</option>
+              <option value="absence">إشعارات غياب</option>
+              <option value="custom">رسائل مخصصة</option>
+              <option value="sent">تم الإرسال</option>
+              <option value="failed">فشل الإرسال</option>
+            </select>
+          </div>
+          <button class="wa-clear-log-btn" onclick="waClearLog()">🗑 مسح السجل</button>
+        </div>
+        <div id="waLogList" class="wa-log-list"></div>
+      </div>
+    </div>
+
+    <!-- Modal: مجموعة واتساب -->
+    <div class="modal-overlay hidden" id="waGroupModal">
+      <div class="modal modal-lg">
+        <div class="modal-header">
+          <h3 id="waGroupModalTitle">مجموعة جديدة</h3>
+          <button class="btn-icon" onclick="closeModal('waGroupModal')">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>اسم المجموعة</label>
+            <input type="text" id="waGroupName" placeholder="مثال: أولياء الحلقة الأولى" />
+          </div>
+          <div class="wa-group-members-header">
+            <span class="section-title" style="margin:0">الأعضاء</span>
+            <div class="wa-group-members-actions">
+              <button class="btn-secondary" onclick="waImportFromClass()">استيراد من حلقة</button>
+              <button class="btn-secondary" onclick="waAddMemberRow()">+ إضافة عضو</button>
+            </div>
+          </div>
+          <select id="waImportClassSel" class="wa-import-class-sel hidden" onchange="waDoImportClass()">
+            <option value="">— اختر الحلقة —</option>
+          </select>
+          <div id="waGroupMembersList" class="wa-group-members-list"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-primary"   onclick="waSaveGroup()">💾 حفظ</button>
+          <button class="btn-secondary" onclick="closeModal('waGroupModal')">إغلاق</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- الطلاب -->
+    <div class="page hidden" id="page-students">
+      <div class="page-head">
+        <h2>الطلاب</h2>
+        <div style="display:flex;gap:8px">
+          <button class="btn-secondary" onclick="openBulkImportModal()">📥 استيراد Excel</button>
+          <button class="btn-primary" onclick="openStudentModal()">+ إضافة طالب</button>
+        </div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="studentSearch" placeholder="🔍 بحث عن طالب…" oninput="renderStudentList()" />
+        <select id="studentClassFilter" onchange="renderStudentList()">
+          <option value="">كل الحلقات</option>
+        </select>
+      </div>
+      <div class="card-list" id="studentList"></div>
+    </div>
+
+    <!-- تقدم القرآن -->
+    <div class="page hidden" id="page-quran">
+      <div class="page-head">
+        <h2>تقدم القرآن الكريم</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="quranClassReportBtn" class="btn-secondary" style="display:none;align-items:center;gap:6px">📥 تقرير الحلقة Excel</button>
+          <button class="btn-primary" onclick="openProgressModal()">+ تسجيل تقدم</button>
+        </div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="quranSearch" placeholder="🔍 بحث عن طالب…" oninput="renderQuranPage()" />
+        <select id="quranClassFilter" onchange="loadQuranSummary()">
+          <option value="">كل الحلقات</option>
+        </select>
+      </div>
+      <div id="quranSummaryGrid" class="quran-summary-grid"></div>
+    </div>
+
+    <!-- الحلقات -->
+    <div class="page hidden" id="page-classes">
+      <div class="page-head">
+        <h2>الحلقات</h2>
+        <button class="btn-primary" onclick="openClassModal()">+ إضافة حلقة</button>
+      </div>
+      <div class="card-list" id="classList"></div>
+    </div>
+
+    <!-- المعلمون -->
+    <div class="page hidden" id="page-teachers">
+      <div class="page-head">
+        <h2>المعلمون</h2>
+        <button class="btn-primary" onclick="openTeacherModal()">+ إضافة معلم</button>
+      </div>
+      <div class="card-list" id="teacherList"></div>
+    </div>
+
+    <!-- حضور المعلمين -->
+    <div class="page hidden" id="page-checkin">
+      <div class="page-head">
+        <h2>حضور المعلمين</h2>
+        <p class="page-sub">مكتب الإدارة  </p>
+      </div>
+      <div class="checkin-clock">
+        <div class="clock-display" id="liveClock"></div>
+        <div class="clock-date" id="liveDate"></div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="checkinSearch" placeholder="🔍 بحث عن معلم…" oninput="renderCheckinList()" />
+      </div>
+      <div class="card-list" id="checkinList"></div>
+      <!-- ملخص اليوم لساعات المعلمين و الإداريين -->
+      <div class="card form-card mt-md" id="teacherSummaryCard" style="display:none">
+        <h3 class="section-title">⏱ ملخص حضور اليوم</h3>
+        <div id="teacherSummaryBody" style="font-size:13px"></div>
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+          <span style="color:var(--text2);font-size:13px">إجمالي ساعات اليوم:</span>
+          <strong id="teacherSummaryTotal" style="font-size:16px;color:var(--primary)"></strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- الإجازات -->
+    <div class="page hidden" id="page-holidays">
+      <div class="page-head">
+        <h2>إدارة الإجازات</h2>
+        <button class="btn-primary" onclick="openHolidayModal()">+ إضافة إجازة</button>
+      </div>
+      <div class="info-banner">
+        <strong>ℹ️ ملاحظة:</strong> كل يوم جمعة يُحدَّد تلقائياً كإجازة. الإجازات اليدوية تأخذ الأولوية على جميع الحالات.
+      </div>
+      <div class="card-list" id="holidayList"></div>
+    </div>
+
+    <!-- التقويم -->
+    <div class="page hidden" id="page-calendar">
+
+      <!-- Top bar -->
+      <div class="cal-topbar">
+        <div class="cal-topbar-nav">
+          <button class="cal-nav-btn" onclick="calChangeMonth(-1)" title="السابق">&#8250;</button>
+          <div class="cal-nav-center">
+            <span class="cal-month-label" id="calMonthLabel">—</span>
+            <span class="cal-month-label-greg" id="calMonthLabelGreg"></span>
+          </div>
+          <button class="cal-nav-btn" onclick="calChangeMonth(1)" title="التالي">&#8249;</button>
+        </div>
+        <div class="cal-topbar-actions">
+          <button class="cal-today-btn" onclick="calGoToday()" id="calTodayBtn">اليوم</button>
+          <div class="cal-view-toggle">
+            <button class="cal-view-btn active" id="calViewGrid"   onclick="calSetView('grid')"   title="شبكة">📅</button>
+            <button class="cal-view-btn"        id="calViewAgenda" onclick="calSetView('agenda')" title="أجندة">☰</button>
+          </div>
+          <button class="cal-menu-btn" id="calMenuBtn" onclick="calToggleMenu()" title="المزيد">⋮</button>
+          <button class="btn-primary cal-add-btn" onclick="openCalEventModal()">+ حدث</button>
+        </div>
+      </div>
+
+      <!-- Dropdown action menu -->
+      <div class="cal-action-menu hidden" id="calActionMenu">
+        <button onclick="calToggleMenu();openWeekOffWizard()">📴 جدولة أسبوع إجازة</button>
+        <button onclick="calToggleMenu();calExportExcel()">📊 تصدير Excel (السنة كاملة)</button>
+        <button onclick="calToggleMenu();calPrint()">🖨️ طباعة الشهر</button>
+        <button onclick="calToggleMenu();calToggleSearch()">🔍 بحث في الأحداث</button>
+      </div>
+
+      <!-- Search bar (hidden by default) -->
+      <div class="cal-search-bar hidden" id="calSearchBar">
+        <input type="text" id="calSearchInput" placeholder="ابحث في الأحداث…" oninput="calDoSearch(this.value)" />
+        <button class="btn-icon" onclick="calToggleSearch()">✕</button>
+        <div class="cal-search-results" id="calSearchResults"></div>
+      </div>
+
+      <!-- Month summary bar -->
+      <div class="cal-summary-bar" id="calSummaryBar"></div>
+
+      <!-- Filter chips -->
+      <div class="cal-filters">
+        <button class="cal-filter active" data-filter="all"      onclick="calSetFilter('all')">الكل</button>
+        <button class="cal-filter"        data-filter="event"    onclick="calSetFilter('event')">📌 أحداث</button>
+        <button class="cal-filter"        data-filter="holiday"  onclick="calSetFilter('holiday')">🏖️ إجازات</button>
+        <button class="cal-filter"        data-filter="offday"   onclick="calSetFilter('offday')">📴 أيام إجازة</button>
+        <button class="cal-filter"        data-filter="message"  onclick="calSetFilter('message')">💬 رسائل</button>
+        <button class="cal-filter"        data-filter="reminder" onclick="calSetFilter('reminder')">🔔 تذكيرات</button>
+      </div>
+
+      <!-- Grid view -->
+      <div id="calGridView">
+        <div class="cal-grid-wrap">
+          <div class="cal-dow-header">
+            <div>أحد</div><div>اثنين</div><div>ثلاثاء</div><div>أربعاء</div>
+            <div>خميس</div><div class="cal-fri-hdr">جمعة</div><div>سبت</div>
+          </div>
+          <div class="cal-grid" id="calGrid"></div>
+        </div>
+      </div>
+
+      <!-- Agenda view -->
+      <div id="calAgendaView" class="hidden">
+        <div id="calAgendaList" class="cal-agenda-list"></div>
+      </div>
+
+      <!-- Day panel -->
+      <div class="cal-day-panel hidden" id="calDayPanel">
+        <div class="cal-day-panel-header">
+          <span id="calDayPanelTitle"></span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn-primary" style="font-size:12px;padding:5px 12px" onclick="calAddEventForDay()">+ إضافة</button>
+            <button class="btn-icon" onclick="calCloseDayPanel()">✕</button>
+          </div>
+        </div>
+        <div id="calDayPanelBody"></div>
+      </div>
+
+    </div>
+
+    <!-- التقارير -->
+    <div class="page hidden" id="page-reports">
+      <div class="page-head"><h2>التقارير</h2></div>
+
+      <!-- ─── تقارير يومية ─── -->
+      <div class="report-section">
+        <h3 class="section-title">📅 التقارير اليومية</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>التاريخ</label>
+            <input type="date" id="rptDailyDate" onchange="updateHijriLabel(this,'rptDateHijri')" />
+            <span class="hijri-label" id="rptDateHijri"></span>
+          </div>
+          <div class="form-group">
+            <label>الحلقة</label>
+            <select id="rptDailyClass">
+              <option value="">جميع الحلقات</option>
+            </select>
+          </div>
+        </div>
+        <div class="btn-row" style="flex-wrap:wrap;gap:8px">
+          <button class="btn-primary" onclick="downloadReport('daily-attendance')">📥 كشف الحضور Excel</button>
+          <button class="btn-secondary" onclick="downloadReport('teacher-log')">👨‍🏫 سجل المعلمين و الإداريين Excel</button>
+        </div>
+      </div>
+
+      <!-- ─── تقارير شهرية ─── -->
+      <div class="report-section">
+        <h3 class="section-title">📆 التقارير الشهرية</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>السنة الهجرية</label>
+            <input type="number" id="rptYear" min="1400" max="1600" placeholder="مثال: 1446" />
+          </div>
+          <div class="form-group">
+            <label>الشهر الهجري</label>
+            <select id="rptMonth">
+              <option value="1">محرم</option>
+              <option value="2">صفر</option>
+              <option value="3">ربيع الأول</option>
+              <option value="4">ربيع الثاني</option>
+              <option value="5">جمادى الأولى</option>
+              <option value="6">جمادى الآخرة</option>
+              <option value="7">رجب</option>
+              <option value="8">شعبان</option>
+              <option value="9">رمضان</option>
+              <option value="10">شوال</option>
+              <option value="11">ذو القعدة</option>
+              <option value="12">ذو الحجة</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>الحلقة</label>
+            <select id="rptMonthlyClass">
+              <option value="">جميع الحلقات</option>
+            </select>
+          </div>
+        </div>
+        <div class="btn-row" style="flex-wrap:wrap;gap:8px">
+          <button class="btn-primary" onclick="downloadReport('monthly')">📥 كشف شهري Excel</button>
+          <button class="btn-secondary" onclick="downloadReport('teacher-monthly-excel')">📊 Excel ساعات المعلمين و الإداريين</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- مزامنة -->
+    <div class="page hidden" id="page-sync">
+      <div class="page-head"><h2>مزامنة ونسخ احتياطي</h2></div>
+      <div class="info-banner">
+        <strong>🔄 مزامنة الشبكة:</strong> صدِّر جميع البيانات كملف JSON من جهازك، ثم استوردها على الأجهزة الأخرى في نفس الشبكة.
+      </div>
+      <div class="report-section">
+        <h3 class="section-title">تصدير جميع البيانات</h3>
+        <p class="section-desc">يُنزِّل ملفاً شاملاً يحتوي على جميع البيانات.</p>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="exportData()">📤 تصدير البيانات</button>
+        </div>
+      </div>
+      <div class="report-section">
+        <h3 class="section-title">استيراد / دمج البيانات</h3>
+        <p class="section-desc">استورد ملف JSON من مشرف آخر. سيتم دمج البيانات دون تكرار.</p>
+        <div class="btn-row">
+          <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData()" />
+          <button class="btn-primary" onclick="document.getElementById('importFile').click()">📥 استيراد البيانات</button>
+        </div>
+        <p id="importStatus" class="status-msg"></p>
+      </div>
+
+      <!-- ══ قسم المُشغِّل ══ -->
+      <div class="report-section launcher-section">
+        <h3 class="section-title">🚀 مُشغِّل التطبيق (تشغيل بدون نافذة سوداء)</h3>
+        <p class="section-desc">تنزيل الملفات التي تتيح تشغيل التطبيق بنقرة مزدوجة دون ظهور نافذة سوداء — وتنسخ رابط الشبكة للجوال تلقائياً.</p>
+
+        <!-- بطاقة الحالة -->
+        <div class="launcher-status-card" id="launcherStatusCard">
+          <div class="launcher-status-loading">⏳ جارٍ التحقق…</div>
+        </div>
+
+        <!-- بطاقات التنزيل -->
+        <div class="launcher-cards">
+
+          <div class="launcher-card launcher-card-primary">
+            <div class="launcher-card-icon">🖱️</div>
+            <div class="launcher-card-body">
+              <div class="launcher-card-title">launch.vbs</div>
+              <div class="launcher-card-desc">انقر نقراً مزدوجاً لتشغيل التطبيق فوراً — لا يحتاج بناء</div>
+            </div>
+            <a class="btn-primary launcher-dl-btn" href="/api/download/launcher-vbs" download="launch.vbs">⬇ تنزيل</a>
+          </div>
+
+          <div class="launcher-card">
+            <div class="launcher-card-icon">📄</div>
+            <div class="launcher-card-body">
+              <div class="launcher-card-title">launcher.js</div>
+              <div class="launcher-card-desc">منطق التشغيل — يجب وضعه بجانب server.js</div>
+            </div>
+            <a class="btn-secondary launcher-dl-btn" href="/api/download/launcher-js" download="launcher.js">⬇ تنزيل</a>
+          </div>
+
+          <div class="launcher-card launcher-card-exe" id="launcherExeCard">
+            <div class="launcher-card-icon">⚙️</div>
+            <div class="launcher-card-body">
+              <div class="launcher-card-title">حضور-الحلقات.exe</div>
+              <div class="launcher-card-desc" id="exeCardDesc">ملف .exe كامل — يعمل بنقرة واحدة بدون Node.js</div>
+            </div>
+            <div id="exeBtnArea">
+              <button class="btn-secondary launcher-dl-btn" onclick="checkExeStatus()">🔄 فحص</button>
+            </div>
+          </div>
+
+          <div class="launcher-card">
+            <div class="launcher-card-icon">🔨</div>
+            <div class="launcher-card-body">
+              <div class="launcher-card-title">build-exe.bat</div>
+              <div class="launcher-card-desc">سكريبت بناء ملف .exe — شغّله مرة واحدة على جهازك</div>
+            </div>
+            <a class="btn-secondary launcher-dl-btn" href="/api/download/build-bat" download="build-exe.bat">⬇ تنزيل</a>
+          </div>
+
+        </div>
+
+        <!-- خطوات الاستخدام -->
+        <div class="launcher-steps">
+          <h4>⚡ الطريقة السريعة (بدون بناء)</h4>
+          <ol>
+            <li>نزّل <strong>launcher.js</strong> وضعه بجانب <code>server.js</code></li>
+            <li>نزّل <strong>launch.vbs</strong> وضعه بجانب <code>server.js</code></li>
+            <li>انقر نقراً مزدوجاً على <code>launch.vbs</code> — تم! 🎉</li>
+          </ol>
+          <h4 style="margin-top:12px">🏗️ بناء ملف .exe (للاستخدام بدون Node.js)</h4>
+          <ol>
+            <li>نزّل <strong>build-exe.bat</strong> وضعه في مجلد المشروع</li>
+            <li>شغّله — سيُثبّت <code>pkg</code> ويبني الملف تلقائياً</li>
+            <li>الملف الناتج: <code>حضور-الحلقات.exe</code> — انسخه إلى أي جهاز ✅</li>
+          </ol>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- الإعدادات -->
+    <div class="page hidden" id="page-settings">
+      <div class="page-head"><h2>الإعدادات والهوية البصرية</h2></div>
+
+      <!-- بيانات المنشأة -->
+      <div class="card form-card">
+        <h3 class="section-title">🏫 بيانات المنشأة</h3>
+        <div class="form-group">
+          <label>اسم المنشأة</label>
+          <input type="text" id="settSchoolName" placeholder="مثال: حلقات القرآن الكريم" />
+        </div>
+        <div class="form-group">
+          <label>العنوان الفرعي (يظهر في التقارير)</label>
+          <input type="text" id="settSubtitle" placeholder="مثال: إدارة التعليم بمنطقة الرياض" />
+        </div>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="saveSettings()">💾 حفظ البيانات</button>
+        </div>
+        <p id="settStatus" class="status-msg"></p>
+      </div>
+
+      <!-- الشعارات -->
+      <div class="card form-card mt-md">
+        <h3 class="section-title">🖼 الشعارات والهوية البصرية</h3>
+        <p class="section-desc">أضف شعارات المنشأة ووزارة التعليم وأي شعار تريده. ستظهر في جميع ملفات Excel و PDF تلقائياً.</p>
+
+        <!-- منطقة رفع شعار -->
+        <div class="logo-upload-area" id="logoUploadArea">
+          <div class="logo-upload-icon">🖼</div>
+          <p class="logo-upload-text">اسحب الشعار هنا أو اضغط للاختيار</p>
+          <p class="logo-upload-hint">PNG أو JPG — بحد أقصى 3 ميجابايت</p>
+          <input type="file" id="logoFile" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="handleLogoUpload()" />
+          <button class="btn-secondary" onclick="document.getElementById('logoFile').click()">📁 اختيار شعار</button>
+        </div>
+
+        <!-- معاينة قبل الرفع -->
+        <div id="logoPreviewArea" class="hidden">
+          <div class="logo-preview-wrap">
+            <img id="logoPreviewImg" src="" alt="معاينة" class="logo-preview-img" />
+            <div class="form-group" style="flex:1">
+              <label>اسم الشعار</label>
+              <input type="text" id="logoName" placeholder="مثال: شعار وزارة التعليم" />
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn-primary" onclick="uploadLogo()">⬆ رفع الشعار</button>
+            <button class="btn-secondary" onclick="cancelLogoPreview()">إلغاء</button>
+          </div>
+        </div>
+
+        <!-- قائمة الشعارات الحالية -->
+        <div id="logoList" class="logo-list"></div>
+        <p class="section-desc" style="margin-top:8px">💡 يمكنك إضافة حتى 4 شعارات. الترتيب من اليمين إلى اليسار في التقارير.</p>
+      </div>
+
+      <!-- معاينة الهوية -->
+      <div class="card form-card mt-md">
+        <h3 class="section-title">👁 معاينة رأس التقرير</h3>
+        <div class="brand-preview" id="brandPreview">
+          <div class="brand-preview-logos" id="previewLogos"></div>
+          <div class="brand-preview-name" id="previewName">اسم المنشأة</div>
+          <div class="brand-preview-sub" id="previewSub"></div>
+          <div class="brand-preview-bar">عنوان التقرير — التاريخ الهجري</div>
+        </div>
+      </div>
+
+      <!-- الرمز السري -->
+      <div class="card form-card mt-md">
+        <h3 class="section-title">🔒 الرمز السري</h3>
+        <div class="form-group">
+          <input type="password" id="settOldPin" placeholder="الرمز الحالي" maxlength="4" />
+          <input type="password" id="settNewPin" placeholder="الرمز الجديد (4 أرقام)" maxlength="4" class="mt-xs" />
+          <input type="password" id="settConfPin" placeholder="تأكيد الرمز الجديد" maxlength="4" class="mt-xs" />
+        </div>
+        <div class="btn-row">
+          <button class="btn-primary" onclick="changePin()">🔑 تغيير الرمز</button>
+        </div>
+        <p id="pinStatus" class="status-msg"></p>
+      </div>
+
+      <!-- معلومات الشبكة ورمز QR -->
+      <div class="card form-card mt-md">
+        <h3 class="section-title">🌐 معلومات الشبكة ورمز QR</h3>
+        <p class="section-desc">شارك هذا الرابط مع المشرفين على نفس شبكة WiFi:</p>
+        <div class="mono-block" id="networkInfo">جارٍ التحميل…</div>
+        <div style="display:flex;align-items:flex-start;gap:24px;margin-top:16px;flex-wrap:wrap">
+          <div style="text-align:center">
+            <div id="settQrCanvas" style="display:inline-block;background:#fff;padding:8px;border-radius:10px;border:2px solid var(--border);min-width:130px;min-height:130px"></div>
+            <div style="font-size:12px;color:var(--text2);margin-top:6px">امسح للوصول من الهاتف</div>
+            <div style="display:flex;gap:6px;margin-top:8px;justify-content:center;flex-wrap:wrap">
+              <button onclick="buildAllQRCodes()" style="padding:5px 12px;font-size:12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;cursor:pointer">🔄 تحديث</button>
+              <button onclick="copyNetworkLink()" style="padding:5px 12px;font-size:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;cursor:pointer;color:#1d4ed8">🔗 نسخ الرابط</button>
+            </div>
+          </div>
+          <div style="flex:1;min-width:180px;font-size:13px;color:var(--text2);line-height:1.8">
+            <strong>كيفية الاستخدام:</strong><br/>
+            ١. تأكد من اتصال هاتفك بنفس شبكة WiFi<br/>
+            ٢. افتح كاميرا الهاتف وامسح رمز QR<br/>
+            ٣. أو اكتب الرابط أعلاه في المتصفح
+          </div>
+        </div>
+      </div>
+
+      <!-- إعدادات واتساب — Fonnte -->
+      <div class="card form-card mt-md">
+        <h3 class="section-title">💬 إشعارات واتساب (Fonnte)</h3>
+
+        <!-- بطاقة الشرح -->
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:14px;margin-bottom:16px;font-size:13px;line-height:1.8">
+          <strong>⚡ كيف تُعِدّ Fonnte (مجاناً):</strong><br/>
+          <span class="wa-step-num" style="background:#16a34a;color:#fff;border-radius:50%;padding:1px 7px;font-size:11px;margin-left:4px">١</span>
+          اذهب إلى <a href="https://md.fonnte.com" target="_blank" style="color:var(--primary);font-weight:600">md.fonnte.com</a> وسجّل حساباً مجانياً<br/>
+          <span class="wa-step-num" style="background:#16a34a;color:#fff;border-radius:50%;padding:1px 7px;font-size:11px;margin-left:4px">٢</span>
+          اضغط "Add Device" ثم امسح رمز QR بواتساب الخاص بك<br/>
+          <span class="wa-step-num" style="background:#16a34a;color:#fff;border-radius:50%;padding:1px 7px;font-size:11px;margin-left:4px">٣</span>
+          انسخ الـ <strong>Token</strong> وضعه في الحقل أدناه<br/>
+          <span style="color:#16a34a">✅ بعدها يمكنك إرسال رسائل لأي رقم دون أي تسجيل من الطرف الآخر!</span>
+        </div>
+
+        <div class="form-group">
+          <label>Fonnte Token</label>
+          <div style="display:flex;gap:8px">
+            <input type="text" id="settWaApiKey" placeholder="الصق Token هنا من لوحة Fonnte" style="flex:1;font-family:var(--mono);font-size:13px" />
+            <button class="btn-secondary" onclick="testWhatsApp()">🧪 اختبار</button>
+          </div>
+          <p id="waTestStatus" class="status-msg"></p>
+        </div>
+
+        <div class="form-group">
+          <label>رقم هاتف المدير <span style="font-size:11px;color:var(--text2)">(لاستقبال رسالة الاختبار)</span></label>
+          <input type="tel" id="settAdminPhone" placeholder="مثال: 966512345678 (بدون + أو 0)" style="font-family:var(--mono)" />
+          <p class="section-desc" style="margin-top:4px;font-size:11px">يجب أن يكون رقم الواتساب المربوط بجهاز Fonnte أو أي رقم تريد الاختبار معه</p>
+        </div>
+
+        <div class="form-group">
+          <label>رسالة مخصصة <span style="font-size:11px;color:var(--text2)">(اتركها فارغة للرسالة الافتراضية)</span></label>
+          <textarea id="settWaTemplate" rows="4" placeholder="مثال:&#10;السلام عليكم، غاب {اسم_الطالب} عن {الحلقة} يوم {اليوم} بتاريخ {التاريخ}&#10;&#10;المتغيرات: {اسم_الطالب} {الحلقة} {التاريخ} {اليوم} {المنشأة}" style="width:100%;resize:vertical;font-family:var(--font);direction:rtl"></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn-primary" onclick="saveWhatsAppSettings()">💾 حفظ إعدادات واتساب</button>
+        </div>
+        <p id="waSettStatus" class="status-msg"></p>
+      </div>
+    </div>
+
+  </main>
+
+  <nav class="bottom-nav">
+    <button class="bnav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+      <span>🏠</span><span>الرئيسية</span>
+    </button>
+    <button class="bnav-item" data-page="attendance" onclick="navigate('attendance')">
+      <span>✅</span><span>الحضور</span>
+    </button>
+    <button class="bnav-item" data-page="calendar" onclick="navigate('calendar')">
+      <span>🗓️</span><span>التقويم</span>
+    </button>
+    <button class="bnav-item" data-page="students" onclick="navigate('students')">
+      <span>👥</span><span>الطلاب</span>
+    </button>
+    <button class="bnav-item" data-page="checkin" onclick="navigate('checkin')">
+      <span>⏱</span><span>حضور المعلم</span>
+    </button>
+    <button class="bnav-item" data-page="reports" onclick="navigate('reports')">
+      <span>📊</span><span>التقارير</span>
+    </button>
+    <button class="bnav-item bnav-more-btn" onclick="toggleSidebar()">
+      <span>☰</span><span>المزيد</span>
+    </button>
+  </nav>
+</div>
+
+
+<!-- نافذة حدث التقويم -->
+<div class="modal-overlay hidden" id="calEventModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="calEventModalTitle">إضافة حدث</h3>
+      <button class="btn-icon" onclick="closeModal('calEventModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="calEventId" />
+
+      <div class="form-group">
+        <label>نوع الحدث *</label>
+        <div class="cal-type-grid" id="calTypeGrid">
+          <button type="button" class="cal-type-btn active" data-type="event"    onclick="calSelectType('event')">📌 حدث</button>
+          <button type="button" class="cal-type-btn"        data-type="holiday"  onclick="calSelectType('holiday')">🏖️ إجازة رسمية</button>
+          <button type="button" class="cal-type-btn"        data-type="offday"   onclick="calSelectType('offday')">📴 يوم إجازة</button>
+          <button type="button" class="cal-type-btn"        data-type="message"  onclick="calSelectType('message')">💬 رسالة مجدولة</button>
+          <button type="button" class="cal-type-btn"        data-type="reminder" onclick="calSelectType('reminder')">🔔 تذكير</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>العنوان *</label>
+        <input type="text" id="calEventTitle" placeholder="عنوان الحدث…" />
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>تاريخ البداية *</label>
+          <input type="date" id="calEventDate" onchange="updateHijriLabel(this,'calEventHijri');calUpdateDailyPreview()" />
+          <span class="hijri-label" id="calEventHijri"></span>
+        </div>
+        <div class="form-group">
+          <label>تاريخ النهاية</label>
+          <input type="date" id="calEventEndDate" onchange="updateHijriLabel(this,'calEventEndHijri');calUpdateDailyPreview()" />
+          <span class="hijri-label" id="calEventEndHijri"></span>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>الوقت</label>
+          <input type="time" id="calEventTime" oninput="calSyncTimePicker()" onchange="calSyncTimePicker()" style="margin-bottom:8px"/>
+          <div class="time-quick-grid" id="timeQuickGrid">
+            <button type="button" class="time-quick-btn" onclick="calSetTime('07:00')">7:00 ص</button>
+            <button type="button" class="time-quick-btn" onclick="calSetTime('08:00')">8:00 ص</button>
+            <button type="button" class="time-quick-btn" onclick="calSetTime('09:00')">9:00 ص</button>
+            <button type="button" class="time-quick-btn" onclick="calSetTime('10:00')">10:00 ص</button>
+            <button type="button" class="time-quick-btn" onclick="calSetTime('12:00')">12:00 م</button>
+            <button type="button" class="time-quick-btn" onclick="calSetTime('14:00')">2:00 م</button>
+            <button type="button" class="time-quick-btn" onclick="calSetTime('16:00')">4:00 م</button>
+            <button type="button" class="time-quick-btn" onclick="calSetTime('18:00')">6:00 م</button>
+            <button type="button" class="time-quick-btn" onclick="calSetTime('19:00')">7:00 م</button>
+            <button type="button" class="time-quick-btn" onclick="calSetTime('20:00')">8:00 م</button>
+            <button type="button" class="time-quick-btn" onclick="calSetTime('21:00')">9:00 م</button>
+            <button type="button" class="time-quick-btn" onclick="calSetTime('22:00')">10:00 م</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>تكرار</label>
+          <select id="calEventRepeat">
+            <option value="">لا تكرار</option>
+            <option value="weekly">أسبوعي</option>
+            <option value="monthly">شهري (هجري)</option>
+            <option value="yearly">سنوي</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>ملاحظات</label>
+        <textarea id="calEventNote" rows="2" placeholder="تفاصيل إضافية…" style="resize:vertical"></textarea>
+      </div>
+
+      <!-- Daily repeat toggle — shown when type=message AND endDate set -->
+      <div id="calDailyRepeatSection" class="hidden">
+        <div class="cal-daily-repeat-box">
+          <label class="cal-toggle-label">
+            <input type="checkbox" id="calDailyRepeat" onchange="calUpdateDailyPreview()" />
+            <span class="cal-toggle-track"></span>
+            <span>إرسال رسالة يومياً طوال الفترة</span>
+          </label>
+          <div class="cal-daily-preview hidden" id="calDailyPreview"></div>
+        </div>
+      </div>
+
+      <!-- Specific days picker — shown when type=message -->
+      <div id="calSpecificDaysSection" class="hidden">
+        <div class="cal-daily-repeat-box">
+          <label class="cal-toggle-label">
+            <input type="checkbox" id="calUseSpecificDays" onchange="calToggleSpecificDays()" />
+            <span class="cal-toggle-track"></span>
+            <span>إرسال في أيام محددة من التقويم</span>
+          </label>
+          <div id="calSpecificDaysBody" class="hidden" style="margin-top:10px">
+            <button type="button" class="btn-secondary" style="width:100%;margin-bottom:8px" onclick="openDayPickerModal()">📅 اختر الأيام من التقويم</button>
+            <div id="calSpecificDaysChips" class="cal-specific-chips"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="calWaSection" class="hidden">
+        <div class="cal-wa-divider">إعدادات الرسالة</div>
+        <div class="form-group">
+          <label>نص الرسالة *</label>
+          <textarea id="calWaMessage" rows="3" placeholder="نص رسالة واتساب…&#10;متغيرات: {العنوان} {التاريخ} {اليوم} {الاسم} {المنشأة}" style="resize:vertical"></textarea>
+        </div>
+        <div class="form-group">
+          <label>المستلمون</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <button type="button" class="btn-secondary" style="font-size:12px" onclick="calWaAddAllParents()">+ جميع أولياء الأمور</button>
+            <button type="button" class="btn-secondary" style="font-size:12px" onclick="calWaAddGroupChat()">+ مجموعة واتساب (ID)</button>
+            <button type="button" class="btn-secondary" style="font-size:12px" onclick="calWaAddRow()">+ رقم يدوي</button>
+          </div>
+          <div id="calWaRecipients"></div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>اللون</label>
+        <div class="cal-color-row" id="calColorRow">
+          <button type="button" class="cal-color-btn active" data-color="#2563EB" onclick="calSelectColor(this)" style="background:#2563EB"></button>
+          <button type="button" class="cal-color-btn"        data-color="#DC2626" onclick="calSelectColor(this)" style="background:#DC2626"></button>
+          <button type="button" class="cal-color-btn"        data-color="#7C3AED" onclick="calSelectColor(this)" style="background:#7C3AED"></button>
+          <button type="button" class="cal-color-btn"        data-color="#D97706" onclick="calSelectColor(this)" style="background:#D97706"></button>
+          <button type="button" class="cal-color-btn"        data-color="#0D9488" onclick="calSelectColor(this)" style="background:#0D9488"></button>
+          <button type="button" class="cal-color-btn"        data-color="#16A34A" onclick="calSelectColor(this)" style="background:#16A34A"></button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('calEventModal')">إلغاء</button>
+      <button class="btn-primary"   id="calSaveBtn" onclick="saveCalEvent()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة أسبوع الإجازة السريع -->
+<div class="modal-overlay hidden" id="weekOffModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📴 جدولة أسبوع إجازة</h3>
+      <button class="btn-icon" onclick="closeModal('weekOffModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-banner" style="margin-bottom:12px">
+        سيتم تحديد الفترة كأيام إجازة تلقائياً وإيقاف تسجيل الحضور فيها.
+        يمكنك أيضاً جدولة رسالة واتساب تُرسل كل يوم خلال هذه الفترة.
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>من تاريخ *</label>
+          <input type="date" id="woStartDate" onchange="updateHijriLabel(this,'woStartHijri');woCountDays()" />
+          <span class="hijri-label" id="woStartHijri"></span>
+        </div>
+        <div class="form-group">
+          <label>إلى تاريخ *</label>
+          <input type="date" id="woEndDate" onchange="updateHijriLabel(this,'woEndHijri');woCountDays()" />
+          <span class="hijri-label" id="woEndHijri"></span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>اسم الإجازة *</label>
+        <input type="text" id="woTitle" placeholder="مثال: إجازة نصف الفصل" />
+      </div>
+      <div id="woDaysCount" class="cal-days-count hidden"></div>
+      <div class="cal-wa-divider" style="margin-top:14px">رسالة يومية (اختياري)</div>
+      <div class="form-group">
+        <label class="cal-toggle-label">
+          <input type="checkbox" id="woSendMsg" onchange="woToggleMsg()" />
+          <span class="cal-toggle-track"></span>
+          <span>إرسال رسالة واتساب يومياً خلال الإجازة</span>
+        </label>
+      </div>
+      <div id="woMsgSection" class="hidden">
+        <div class="form-group">
+          <label>نص الرسالة</label>
+          <textarea id="woMessage" rows="3" placeholder="مثال: تذكير: المدرسة في إجازة اليوم. نعود يوم …" style="resize:vertical"></textarea>
+        </div>
+        <div class="form-group">
+          <label>المستلمون</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+            <button type="button" class="btn-secondary" style="font-size:12px" onclick="woAddAllParents()">+ جميع أولياء الأمور</button>
+            <button type="button" class="btn-secondary" style="font-size:12px" onclick="woAddGroupChat()">+ مجموعة واتساب (ID)</button>
+          </div>
+          <div id="woRecipients" class="cal-wa-chip-list"></div>
+          <span class="wo-rec-count" id="woRecCount"></span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('weekOffModal')">إلغاء</button>
+      <button class="btn-primary" onclick="saveWeekOff()">✅ جدولة الإجازة</button>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة الطالب -->
+<div class="modal-overlay hidden" id="studentModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="studentModalTitle">إضافة طالب</h3>
+      <button class="btn-icon" onclick="closeModal('studentModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="studentId" />
+      <div class="form-group"><label>رقم الطالب *</label><input type="text" id="fStudentId" placeholder="مثال: STU001" /></div>
+      <div class="form-group"><label>الاسم الكامل *</label><input type="text" id="fStudentName" placeholder="الاسم الكامل" /></div>
+      <div class="form-group"><label>تاريخ الميلاد</label><input type="date" id="fStudentBday" /></div>
+      <div class="form-group"><label>هاتف ولي الأمر</label><input type="tel" id="fStudentPhone" placeholder="05xxxxxxxx" /></div>
+      <div class="form-group">
+        <label>الحلقة *</label>
+        <select id="fStudentClass"><option value="">— اختر الحلقة —</option></select>
+      </div>
+      <div class="form-group">
+        <label>الصورة الشخصية</label>
+        <div class="photo-upload-area">
+          <img id="fStudentPhotoPreview" src="" alt="" class="hidden" />
+          <label class="btn-secondary" for="fStudentPhoto">📷 رفع صورة</label>
+          <input type="file" id="fStudentPhoto" accept="image/*" style="display:none" onchange="previewPhoto()" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('studentModal')">إلغاء</button>
+      <button class="btn-primary" onclick="saveStudent()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة الحلقة -->
+<div class="modal-overlay hidden" id="classModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="classModalTitle">إضافة حلقة</h3>
+      <button class="btn-icon" onclick="closeModal('classModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="classId" />
+      <div class="form-group"><label>اسم الحلقة *</label><input type="text" id="fClassName" placeholder="مثال: حلقة المبتدئين" /></div>
+      <div class="form-group"><label>المستوى</label><input type="text" id="fClassGrade" placeholder="مثال: المستوى الأول" /></div>
+      <div class="form-group"><label>شيخ الحلقة</label><input type="text" id="fClassRoom" placeholder=" " /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('classModal')">إلغاء</button>
+      <button class="btn-primary" onclick="saveClass()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة المعلم -->
+<div class="modal-overlay hidden" id="teacherModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="teacherModalTitle">إضافة معلم</h3>
+      <button class="btn-icon" onclick="closeModal('teacherModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="teacherId" />
+      <div class="form-group"><label>رقم المعلم *</label><input type="text" id="fTeacherId" placeholder="مثال: TCH001" /></div>
+      <div class="form-group"><label>الاسم الكامل *</label><input type="text" id="fTeacherName" placeholder="الاسم الكامل" /></div>
+      <div class="form-group"><label>التخصص</label><input type="text" id="fTeacherSubject" placeholder="مثال: تحفيظ القرآن الكريم" /></div>
+      <div class="form-group"><label>الهاتف</label><input type="tel" id="fTeacherPhone" placeholder="05xxxxxxxx" /></div>
+      <div class="form-group">
+        <label>صورة المعلم</label>
+        <div class="photo-upload-area" onclick="document.getElementById('fTeacherPhoto').click()">
+          <img id="fTeacherPhotoPreview" class="hidden" style="width:80px;height:80px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 8px;" />
+          <div id="fTeacherPhotoPlaceholder" style="font-size:40px;text-align:center;margin-bottom:4px;">👨‍🏫</div>
+          <div style="font-size:12px;color:var(--text2);text-align:center;">اضغط لرفع صورة</div>
+        </div>
+        <input type="file" id="fTeacherPhoto" accept="image/*" style="display:none" onchange="previewTeacherPhoto()" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('teacherModal')">إلغاء</button>
+      <button class="btn-primary" onclick="saveTeacher()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة الإجازة -->
+<div class="modal-overlay hidden" id="holidayModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>إضافة إجازة</h3>
+      <button class="btn-icon" onclick="closeModal('holidayModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>التاريخ *</label><input type="date" id="fHolidayDate" onchange="updateHijriLabel(this,'holidayDateHijri')" /><span class="hijri-label" id="holidayDateHijri"></span></div>
+      <div class="form-group">
+        <label>النوع</label>
+        <select id="fHolidayType">
+          <option value="Weather">طقس سيء</option>
+          <option value="Emergency">طارئ</option>
+          <option value="National">إجازة وطنية</option>
+          <option value="Other">أخرى</option>
+        </select>
+      </div>
+      <div class="form-group"><label>السبب</label><input type="text" id="fHolidayReason" placeholder="وصف مختصر للسبب" /></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('holidayModal')">إلغاء</button>
+      <button class="btn-primary" onclick="saveHoliday()">حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة تفاصيل الطالب -->
+<div class="modal-overlay hidden" id="studentDetailModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>ملف الطالب</h3>
+      <button class="btn-icon" onclick="closeModal('studentDetailModal')">✕</button>
+    </div>
+    <div class="modal-body" id="studentDetailBody"></div>
+  </div>
+</div>
+
+<!-- نافذة الاستيراد الجماعي من Excel -->
+<div class="modal-overlay hidden" id="bulkImportModal">
+  <div class="modal modal-xl">
+    <div class="modal-header">
+      <h3>📥 استيراد الطلاب من Excel / CSV</h3>
+      <button class="btn-icon" onclick="closeBulkImport()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- الخطوة 1: رفع الملف -->
+      <div id="importStep1">
+        <p class="section-desc">ارفع ملف Excel (.xlsx) أو CSV يحتوي على بيانات الطلاب. يجب أن يكون السطر الأول هو رؤوس الأعمدة.</p>
+        <div class="import-drop-zone" id="importDropZone">
+          <div class="import-drop-icon">📊</div>
+          <p class="import-drop-text">اسحب الملف هنا أو اضغط للاختيار</p>
+          <p class="import-drop-hint">.xlsx أو .xls أو .csv — بحد أقصى 10 ميجابايت</p>
+          <input type="file" id="importExcelFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImportFile()" />
+          <button class="btn-primary" onclick="document.getElementById('importExcelFile').click()">📁 اختيار ملف</button>
+        </div>
+        <div class="import-template-hint">
+          <strong>💡 مثال على أعمدة Excel المدعومة:</strong><br/>
+          <code>اسم الطالب</code> أو <code>name</code> &nbsp;|&nbsp;
+          <code>رقم الطالب</code> أو <code>studentId</code> &nbsp;|&nbsp;
+          <code>هاتف ولي الأمر</code> أو <code>parentPhone</code> &nbsp;|&nbsp;
+          <code>تاريخ الميلاد</code> أو <code>birthday</code>
+        </div>
+      </div>
+
+      <!-- الخطوة 2: مطابقة الأعمدة -->
+      <div id="importStep2" class="hidden">
+        <div class="import-mapping-header">
+          <div class="import-file-info" id="importFileInfo"></div>
+          <button class="btn-secondary" style="font-size:12px" onclick="resetImport()">↩ تغيير الملف</button>
+        </div>
+        <h4 class="section-title" style="margin:14px 0 8px">🔗 مطابقة الأعمدة</h4>
+        <p class="section-desc">طابق أعمدة ملفك مع حقول النظام:</p>
+        <div class="import-mapping-grid" id="importMappingGrid"></div>
+
+        <div class="form-group mt-sm">
+          <label>الحلقة الافتراضية (اختياري)</label>
+          <select id="importDefaultClass">
+            <option value="">— لا تُعيَّن حلقة —</option>
+          </select>
+        </div>
+
+        <h4 class="section-title" style="margin:14px 0 8px">👁 معاينة أول 5 صفوف</h4>
+        <div style="overflow-x:auto">
+          <table class="import-preview-table" id="importPreviewTable"></table>
+        </div>
+        <p id="importMappingNote" class="section-desc" style="margin-top:8px;color:var(--warn)"></p>
+      </div>
+
+      <!-- الخطوة 3: نتيجة الاستيراد -->
+      <div id="importStep3" class="hidden">
+        <div class="import-result" id="importResult"></div>
+      </div>
+
+    </div>
+    <div class="modal-footer" id="importFooter">
+      <button class="btn-secondary" onclick="closeBulkImport()">إلغاء</button>
+      <button class="btn-primary hidden" id="importConfirmBtn" onclick="confirmBulkImport()">✅ استيراد الطلاب</button>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة الإذن المسبق / الإجازة المرضية -->
+<div class="modal-overlay hidden" id="leaveModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🏥 تسجيل إذن / إجازة مسبقة</h3>
+      <button class="btn-icon" onclick="closeModal('leaveModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="section-desc" style="margin-bottom:12px">سجّل إذناً مسبقاً لطالب قبل حضوره — سيُحسب ضمن السجل كـ "بعذر".</p>
+      <div class="form-group">
+        <label>الطالب *</label>
+        <select id="fLeaveStudent"><option value="">— اختر الطالب —</option></select>
+      </div>
+      <div class="form-group">
+        <label>التاريخ *</label>
+        <input type="date" id="fLeaveDate" onchange="updateHijriLabel(this,'leaveDateHijri')" />
+        <span class="hijri-label" id="leaveDateHijri"></span>
+      </div>
+      <div class="form-group">
+        <label>نوع الإذن *</label>
+        <select id="fLeaveType">
+          <option value="Sick">🤒 مرض</option>
+          <option value="Permission">📋 إذن خروج</option>
+          <option value="Travel">✈️ سفر</option>
+          <option value="Family">👨‍👩‍👦 ظرف عائلي</option>
+          <option value="Other">📝 أخرى</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>السبب / التفاصيل</label>
+        <input type="text" id="fLeaveReason" placeholder="وصف مختصر للسبب" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('leaveModal')">إلغاء</button>
+      <button class="btn-primary" onclick="saveLeave()">💾 تسجيل الإذن</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<!-- نافذة ملف المعلم -->
+<div class="modal-overlay hidden" id="teacherProfileModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3>ملف المعلم</h3>
+      <button class="btn-icon" onclick="closeModal('teacherProfileModal')">✕</button>
+    </div>
+    <div class="modal-body" id="teacherProfileBody"></div>
+  </div>
+</div>
+
+<!-- نافذة تسجيل تقدم القرآن -->
+<div class="modal-overlay hidden" id="quranProgressModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="quranModalTitle">📖 تسجيل تقدم القرآن</h3>
+      <button class="btn-icon" onclick="closeModal('quranProgressModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="qpId" />
+      <div class="form-group">
+        <label>الطالب *</label>
+        <select id="qpStudentId" onchange="onQpStudentChange()">
+          <option value="">— اختر الطالب —</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>التاريخ *</label>
+          <input type="date" id="qpDate" onchange="updateHijriLabel(this,'qpDateHijri')" />
+          <span class="hijri-label" id="qpDateHijri"></span>
+        </div>
+        <div class="form-group">
+          <label>نوع الجلسة *</label>
+          <select id="qpType">
+            <option value="memorization">🆕 حفظ جديد</option>
+            <option value="revision">🔄 مراجعة</option>
+            <option value="recitation">🎤 تلاوة وتجويد</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>السورة (من)</label>
+          <select id="qpSurahFrom"></select>
+        </div>
+        <div class="form-group">
+          <label>آية (من)</label>
+          <input type="number" id="qpAyahFrom" min="1" placeholder="رقم الآية" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>السورة (إلى)</label>
+          <select id="qpSurahTo"></select>
+        </div>
+        <div class="form-group">
+          <label>آية (إلى)</label>
+          <input type="number" id="qpAyahTo" min="1" placeholder="رقم الآية" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>الجزء</label>
+          <select id="qpJuz">
+            <option value="">—</option>
+            <option value="1">الجزء 1</option><option value="2">الجزء 2</option>
+            <option value="3">الجزء 3</option><option value="4">الجزء 4</option>
+            <option value="5">الجزء 5</option><option value="6">الجزء 6</option>
+            <option value="7">الجزء 7</option><option value="8">الجزء 8</option>
+            <option value="9">الجزء 9</option><option value="10">الجزء 10</option>
+            <option value="11">الجزء 11</option><option value="12">الجزء 12</option>
+            <option value="13">الجزء 13</option><option value="14">الجزء 14</option>
+            <option value="15">الجزء 15</option><option value="16">الجزء 16</option>
+            <option value="17">الجزء 17</option><option value="18">الجزء 18</option>
+            <option value="19">الجزء 19</option><option value="20">الجزء 20</option>
+            <option value="21">الجزء 21</option><option value="22">الجزء 22</option>
+            <option value="23">الجزء 23</option><option value="24">الجزء 24</option>
+            <option value="25">الجزء 25</option><option value="26">الجزء 26</option>
+            <option value="27">الجزء 27</option><option value="28">الجزء 28</option>
+            <option value="29">الجزء 29</option><option value="30">الجزء 30</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>الصفحة (من–إلى)</label>
+          <div style="display:flex;gap:6px">
+            <input type="number" id="qpPageFrom" min="1" max="604" placeholder="من" style="flex:1" />
+            <input type="number" id="qpPageTo"   min="1" max="604" placeholder="إلى" style="flex:1" />
+          </div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>التقييم</label>
+          <select id="qpGrade">
+            <option value="">— لا تقييم —</option>
+            <option value="ممتاز">⭐⭐⭐ ممتاز</option>
+            <option value="جيد جداً">⭐⭐ جيد جداً</option>
+            <option value="جيد">⭐ جيد</option>
+            <option value="مقبول">✅ مقبول</option>
+            <option value="ضعيف">⚠️ ضعيف — يحتاج مراجعة</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>ملاحظات المعلم</label>
+        <textarea id="qpNotes" rows="2" placeholder="ملاحظات إضافية…" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('quranProgressModal')">إلغاء</button>
+      <button class="btn-primary" onclick="saveProgress()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة سجل تقدم الطالب القرآني -->
+<div class="modal-overlay hidden" id="quranStudentModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3 id="quranStudentModalTitle">📖 سجل تقدم القرآن</h3>
+      <button class="btn-icon" onclick="closeModal('quranStudentModal')">✕</button>
+    </div>
+    <div class="modal-body" id="quranStudentModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('quranStudentModal')">إغلاق</button>
+      <button class="btn-primary" onclick="openProgressModal(_quranViewStudentId)">+ تسجيل تقدم جديد</button>
+    </div>
+  </div>
+</div>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="app.js"></script>
+
+<!-- ══════════════════════════════════════════
+     نافذة تأكيد حفظ الحضور (Attendance Saved)
+══════════════════════════════════════════ -->
+<div class="att-saved-overlay hidden" id="attSavedModal">
+  <div class="att-saved-modal">
+    <div class="att-saved-header">
+      <div class="att-saved-check">✅</div>
+      <div class="att-saved-title">تم حفظ الحضور بنجاح!</div>
+      <div class="att-saved-subtitle">تم تسجيل بيانات الحضور وحفظها في النظام</div>
+      <div class="att-saved-meta">
+        <span class="att-saved-badge" id="attSavedDate">—</span>
+        <span class="att-saved-badge" id="attSavedClass">—</span>
+        <span class="att-saved-badge att-saved-badge-next hidden" id="attSavedNextBadge">—</span>
+      </div>
+    </div>
+
+    <div class="att-saved-body">
+      <!-- إحصائيات -->
+      <div class="att-saved-stats">
+        <div class="att-stat-item att-stat-present">
+          <div class="att-stat-item-num" id="attSavedPresent">0</div>
+          <div class="att-stat-item-lbl">حاضر</div>
+        </div>
+        <div class="att-stat-item att-stat-absent">
+          <div class="att-stat-item-num" id="attSavedAbsent">0</div>
+          <div class="att-stat-item-lbl">غائب</div>
+        </div>
+        <div class="att-stat-item att-stat-late">
+          <div class="att-stat-item-num" id="attSavedLate">0</div>
+          <div class="att-stat-item-lbl">متأخر</div>
+        </div>
+        <div class="att-stat-item att-stat-excused">
+          <div class="att-stat-item-num" id="attSavedExcused">0</div>
+          <div class="att-stat-item-lbl">بعذر</div>
+        </div>
+      </div>
+      <div class="att-saved-total">
+        إجمالي الطلاب المسجلين: <strong id="attSavedTotal">0</strong> طالب
+      </div>
+
+      <!-- لوحة الغياب + واتساب — تظهر فقط إذا كان هناك غائبون -->
+      <div id="attSavedWaSection" class="att-saved-wa-section hidden">
+        <div class="att-saved-wa-title">
+          <span class="att-saved-wa-dot"></span>
+          <span>غائبون — إشعارات واتساب</span>
+        </div>
+        <div id="attSavedWaList" class="att-saved-wa-list"></div>
+        <div id="attSavedWaSendStatus" class="att-saved-wa-status hidden"></div>
+      </div>
+
+      <!-- أزرار الإجراءات — يُولَّد بواسطة JS -->
+      <div id="attSavedActions"></div>
+
+    </div><!-- /att-saved-body -->
+  </div><!-- /att-saved-modal -->
+</div><!-- /attSavedModal overlay -->
+
+<!-- Day Picker Modal -->
+<div class="modal-overlay hidden" id="dayPickerModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3>📅 اختر الأيام</h3>
+      <button class="btn-icon" onclick="closeDayPickerModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="dp-nav">
+        <button class="btn-icon" onclick="dpPrevMonth()">&#8250;</button>
+        <span id="dpMonthLabel" style="font-weight:700;font-size:15px"></span>
+        <button class="btn-icon" onclick="dpNextMonth()">&#8249;</button>
+      </div>
+      <div class="dp-weekdays">
+        <span>أح</span><span>إث</span><span>ث</span><span>أر</span><span>خ</span><span>ج</span><span>س</span>
+      </div>
+      <div id="dpGrid" class="dp-grid"></div>
+      <div class="dp-legend">
+        <span><span class="dp-dot" style="background:#2563EB;display:inline-block;border-radius:50%"></span> حدث</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#FFFBEB;border:1px solid #D97706;border-radius:3px"></span> جمعة</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#FEF2F2;border:1px solid #DC2626;border-radius:3px"></span> إجازة</span>
+      </div>
+      <div id="dpSelectedCount" style="text-align:center;font-size:13px;color:var(--text2);margin-top:8px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeDayPickerModal()">إلغاء</button>
+      <button class="btn-primary"   onclick="saveDayPicker()">✅ حفظ الأيام المختارة</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
