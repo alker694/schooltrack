@@ -255,6 +255,11 @@ async function loadAndDisplayLogos() {
     }
 
     // شعارات الهيدر
+    // Cache dateFormat in state so updateTodayBadge can use it without an extra fetch
+    if (!state.settings) state.settings = {};
+    state.settings.dateFormat = settings.dateFormat || dfDefaultFormat();
+    updateTodayBadge(state.settings.dateFormat);
+
     const headerLogosEl = document.getElementById('headerLogos');
     if (headerLogosEl && logos.length > 0) {
       headerLogosEl.innerHTML = logos.slice(0,2).map(l =>
@@ -607,9 +612,23 @@ function setDateToday(inputId, labelId) {
   if (labelId) updateHijriLabel(input, labelId);
 }
 
-function updateTodayBadge() {
+function buildHijriDateString(tokens, sep) {
+  const h = toHijri(todayISO());
+  const vals = { day: String(h.day), month: HIJRI_MONTHS[h.month], year: String(h.year) };
+  return tokens
+    .filter(t => t.on)
+    .map(t => {
+      if (t.key === 'year') return `<bdi>${vals.year}</bdi>هـ`;
+      return `<bdi>${vals[t.key] || ''}</bdi>`;
+    })
+    .join(sep);
+}
+
+function updateTodayBadge(fmt) {
   const badge = document.getElementById('todayBadge');
-  if (badge) badge.textContent = formatHijri(todayISO());
+  if (!badge) return;
+  const f = fmt || (state.settings && state.settings.dateFormat) || dfDefaultFormat();
+  badge.innerHTML = buildHijriDateString(f.tokens, f.sep);
 }
 
 function startClock() {
@@ -724,16 +743,7 @@ async function loadAttendanceStudents() {
     return;
   }
 
-  // ── Already-saved banner ─────────────────────────────
-  if (alreadySaved) {
-    const savedBanner = document.createElement('div');
-    savedBanner.className = 'att-saved-banner';
-    savedBanner.innerHTML = `
-      <span>✅ تم تسجيل الحضور مسبقاً لهذا اليوم</span>
-      <button class="att-edit-saved-btn" onclick="unlockAttendance()">✏️ تعديل</button>
-    `;
-    container.appendChild(savedBanner);
-  }
+
 
   const leaveTypeLabel = { Sick:'🤒 مرض', Permission:'📋 إذن', Travel:'✈️ سفر', Family:'🚨 طارئ', Other:'📝 أخرى' };
 
@@ -804,7 +814,7 @@ async function loadAttendanceStudents() {
                 <button class="att-btn att-btn-late ${status==='Late'?'active':''}" onclick="setAttStatus('${s.id}','Late')">
                   <span class="att-btn-icon">⏱</span><span>متأخر</span>
                 </button>
-                <button class="att-btn att-btn-excused ${status==='Excused'?'active':''}" onclick="setAttStatus('${s.id}','Excused')">
+                <button class="att-btn att-btn-excused ${status==='Excused'?'active':''}" onclick="setAttStatus('${s.id}','Excused')" title="بعذر (ليس مرضاً أو طارئاً — استخدم إذن مسبق لذلك)">
                   <span class="att-btn-icon">🏥</span><span>بعذر</span>
                 </button>
               `
@@ -835,7 +845,7 @@ function setAttStatus(studentId, status) {
   }
   // Block if attendance already saved and not unlocked
   if (_attAlreadySaved) {
-    toast('تم تسجيل الحضور مسبقاً — اضغط "تعديل" للتغيير');
+    toast('تم تسجيل الحضور مسبقاً لهذا اليوم');
     return;
   }
   row.className = `att-row status-${status}${row.classList.contains('att-row-has-leave') ? ' att-row-has-leave' : ''}`;
@@ -890,7 +900,8 @@ async function saveAttendance() {
     const row        = document.getElementById(`att-row-${s.id}`);
     if (!row) return null;
     const statusClass = [...row.classList].find(c => c.startsWith('status-'));
-    let   status     = statusClass ? statusClass.replace('status-','') : 'Absent';
+    let   status     = statusClass ? statusClass.replace('status-','') : '';
+    if (!status) return null; // no status selected — skip this student
     // If student has an active leave with no manual override, force Excused
     if (_currentLeaveMap[s.id] && status === 'Absent') status = 'Excused';
     const notes      = row.querySelector('.att-notes')?.value || '';
@@ -1222,6 +1233,13 @@ async function initSettings() {
   updateBrandPreview(s);
   setupLogoDragDrop();
   if (!_qrNetworkUrl) { loadPinQR().then(buildAllQRCodes); } else { buildAllQRCodes(); }
+  // Populate date format builder
+  const fmt = s.dateFormat || dfDefaultFormat();
+  if (!state.settings) state.settings = {};
+  state.settings.dateFormat = fmt;
+  dfRenderTokens(fmt);
+  dfSetActiveSep(fmt.sep || ' ');
+  dfUpdatePreview();
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1614,17 +1632,32 @@ function renderStudentList() {
   students.forEach(s => {
     const cls  = state.classes.find(c => c.id === s.classId);
     const card = document.createElement('div');
-    card.className = 'list-card';
-    card.innerHTML = `
-      <div class="list-card-avatar">${s.photo?`<img src="${s.photo}" alt="${s.name}" onerror="this.style.display='none'" />`:'👤'}</div>
-      <div class="list-card-body" onclick="viewStudent('${s.id}')">
-        <div class="list-card-name">${s.name}</div>
-        <div class="list-card-sub">${s.studentId||'—'} · ${cls?.name||'بدون حلقة'}</div>
-      </div>
-      <div class="list-card-actions">
-        <button class="btn-icon" onclick="openStudentModal('${s.id}')">✏️</button>
-        <button class="btn-icon" onclick="deleteStudent('${s.id}')">🗑</button>
-      </div>`;
+    const inBulk = _studentBulkMode;
+    card.className = 'list-card' + (inBulk ? ' list-card-selectable' : '');
+    card.dataset.studentId = s.id;
+    if (inBulk) {
+      const checked = _studentBulkSelected.has(s.id);
+      card.classList.toggle('list-card-selected', checked);
+      card.innerHTML = `
+        <div class="bulk-checkbox">${checked ? '☑' : '☐'}</div>
+        <div class="list-card-avatar">${s.photo?`<img src="${s.photo}" alt="${s.name}" onerror="this.style.display='none'" />`:'👤'}</div>
+        <div class="list-card-body" style="cursor:default">
+          <div class="list-card-name">${s.name}</div>
+          <div class="list-card-sub">${s.studentId||'—'} · ${cls?.name||'بدون حلقة'}</div>
+        </div>`;
+      card.onclick = () => studentBulkToggle(s.id);
+    } else {
+      card.innerHTML = `
+        <div class="list-card-avatar">${s.photo?`<img src="${s.photo}" alt="${s.name}" onerror="this.style.display='none'" />`:'👤'}</div>
+        <div class="list-card-body" onclick="viewStudent('${s.id}')">
+          <div class="list-card-name">${s.name}</div>
+          <div class="list-card-sub">${s.studentId||'—'} · ${cls?.name||'بدون حلقة'}</div>
+        </div>
+        <div class="list-card-actions">
+          <button class="btn-icon" onclick="openStudentModal('${s.id}')">✏️</button>
+          <button class="btn-icon" onclick="deleteStudent('${s.id}')">🗑</button>
+        </div>`;
+    }
     list.appendChild(card);
   });
 }
@@ -1680,18 +1713,36 @@ async function viewStudent(id) {
   const history = (s.history||[]).slice(0,30);
   const qpList  = await apiFetch(`/quran-progress?studentId=${id}`);
   const translateStatus = st => ({ Present:'حاضر', Absent:'غائب', Late:'متأخر', Excused:'بعذر', Holiday:'إجازة' }[st]||st);
-  const badgeClass      = st => ({ Present:'present', Absent:'absent', Late:'late', Holiday:'holiday' }[st]||'default');
+  const badgeClass      = st => ({ Present:'present', Absent:'absent', Late:'late', Excused:'excused', Holiday:'holiday' }[st]||'default');
 
   const latestQP = qpList && qpList.length ? qpList[0] : null;
   const qpProgress = latestQP ? formatQPPosition(latestQP) : 'لم يُسجَّل بعد';
 
   // attendance stats
+  const leaves     = s.leaves || [];
+  const exitPerms  = leaves.filter(l => l.type === 'Permission');
+  const exitCount  = exitPerms.length;
+  const notices    = s.notices || [];
+  const pledgeCnt  = notices.filter(n => n.type === 'تعهد').length;
+  const warnCnt    = notices.filter(n => n.type === 'إنذار').length;
   const totalRecs  = history.length;
   const presentCnt = history.filter(h=>h.status==='Present').length;
   const absentCnt  = history.filter(h=>h.status==='Absent').length;
   const lateCnt    = history.filter(h=>h.status==='Late').length;
   const excusedCnt = history.filter(h=>h.status==='Excused').length;
   const attendRate = totalRecs ? Math.round((presentCnt + excusedCnt) / totalRecs * 100) : '—';
+
+  // today's attendance record (if any)
+  const todayRec = history.find(h => h.date === todayISO()) || null;
+  const todayStatusLabel = {
+    Present: '✅ حاضر', Absent: '❌ غائب', Late: '⏱ متأخر', Excused: '🏥 بعذر', Holiday: '🏖️ إجازة'
+  };
+  const todayStatusColor = {
+    Present:'#16a34a', Absent:'#dc2626', Late:'#d97706', Excused:'#7c3aed', Holiday:'#0891b2'
+  };
+  const todayStatusBg = {
+    Present:'#f0fdf4', Absent:'#fef2f2', Late:'#fffbeb', Excused:'#faf5ff', Holiday:'#ecfeff'
+  };
 
   document.getElementById('studentDetailBody').innerHTML = `
     <!-- رأس الملف -->
@@ -1705,13 +1756,17 @@ async function viewStudent(id) {
         </div>
         ${s.parentPhone ? `<div class="sp-phone"><a href="tel:${s.parentPhone}">📞 ${s.parentPhone}</a></div>` : ''}
         ${s.birthday    ? `<div class="sp-dob">🎂 ${s.birthday}</div>` : ''}
+        ${todayRec ? `<div class="sp-today-status" style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;background:${todayStatusBg[todayRec.status]||'#f3f4f6'};color:${todayStatusColor[todayRec.status]||'#374151'};border:1.5px solid ${todayStatusColor[todayRec.status]||'#d1d5db'}33;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">
+          حضور اليوم: ${todayStatusLabel[todayRec.status] || todayRec.status}
+        </div>` : '<div class="sp-today-status" style="margin-top:6px;display:inline-flex;align-items:center;gap:6px;background:#f8fafc;color:#94a3b8;border:1.5px solid #e2e8f0;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600">لم يُسجَّل حضور اليوم</div>'}
       </div>
       <button class="btn-secondary sp-edit-btn" onclick="closeModal('studentDetailModal');openStudentModal('${s.id}')">✏️ تعديل</button>
     </div>
 
-    <!-- إجراءات سريعة — إذن مسبق -->
+    <!-- غياب بعذر — مرض / طارئ / سفر -->
     <div class="sp-quick-actions">
-      <div class="sp-qa-title">⚡ إجراء سريع — إذن غياب</div>
+      <div class="sp-qa-title">🏥 تسجيل غياب بعذر</div>
+      <div style="font-size:11px;color:#92400E;margin-bottom:10px;margin-top:-4px">✅ سيُسجَّل الغياب تلقائياً كـ <strong>بعذر</strong> — وليس غائباً</div>
       <div class="sp-qa-grid">
         <button class="sp-qa-btn sp-qa-sick"      onclick="quickLeave('${s.id}','${s.classId}','Sick')">
           <span class="sp-qa-icon">🤒</span><span class="sp-qa-label">مرض</span>
@@ -1721,9 +1776,6 @@ async function viewStudent(id) {
         </button>
         <button class="sp-qa-btn sp-qa-travel"    onclick="quickLeave('${s.id}','${s.classId}','Travel')">
           <span class="sp-qa-icon">✈️</span><span class="sp-qa-label">سفر</span>
-        </button>
-        <button class="sp-qa-btn sp-qa-permission" onclick="quickLeave('${s.id}','${s.classId}','Permission')">
-          <span class="sp-qa-icon">📋</span><span class="sp-qa-label">إذن خروج</span>
         </button>
         <button class="sp-qa-btn sp-qa-other"     onclick="quickLeave('${s.id}','${s.classId}','Other')">
           <span class="sp-qa-icon">📝</span><span class="sp-qa-label">أخرى</span>
@@ -1737,12 +1789,58 @@ async function viewStudent(id) {
       <div id="spQuickResult" class="sp-qa-result hidden"></div>
     </div>
 
+    <!-- إذن خروج — فقط للطلاب الحاضرين -->
+    <div class="sp-exit-card">
+      <div class="sp-exit-header">
+        <span class="sp-exit-icon">📋</span>
+        <div>
+          <div class="sp-exit-title">إذن خروج
+            ${exitCount > 0 ? `<span class="sp-exit-count-badge">${exitCount} سابق</span>` : ''}
+          </div>
+          <div class="sp-exit-subtitle">يُعطى فقط للطالب الحاضر الذي يغادر مبكراً — لا يُغيِّر حالة الحضور</div>
+        </div>
+      </div>
+      ${todayRec?.status === 'Present' ? `
+        <div class="sp-exit-form">
+          <input type="text" id="spExitNote" placeholder="سبب الخروج (اختياري)…" class="sp-exit-note-input" />
+          <button class="btn-primary sp-exit-btn" onclick="grantExitPermit('${s.id}','${s.classId}')">
+            📋 منح إذن الخروج
+          </button>
+        </div>
+        ${exitCount > 0 ? `
+        <div class="sp-exit-history">
+          ${exitPerms.slice(0,3).map(l => `<div class="sp-exit-hist-row"><span class="sp-exit-hist-date">${formatHijri(l.date)}</span><span class="sp-exit-hist-note">${l.reason || '—'}</span></div>`).join('')}
+          ${exitCount > 3 ? `<div style="font-size:11px;color:var(--text2);margin-top:4px">+ ${exitCount - 3} أخرى</div>` : ''}
+        </div>` : ''}
+      ` : `
+        <div class="sp-exit-locked">
+          🔒 الطالب غير حاضر اليوم — إذن الخروج متاح فقط بعد تسجيل الحضور
+        </div>
+      `}
+    </div>
+
+    ${todayRec ? `
+    <!-- تعديل حالة الحضور — يظهر فقط إذا سُجِّل الحضور اليوم -->
+    <div class="sp-edit-att-card">
+      <div class="sp-edit-att-header">
+        <span class="sp-edit-att-icon">✏️</span>
+        <span class="sp-edit-att-title">تعديل حالة الحضور</span>
+      </div>
+      <p class="sp-edit-att-desc">اختر التاريخ ثم اضغط «تعديل» لتغيير الحالة.</p>
+      <div class="sp-edit-att-row">
+        <input type="date" id="spEditAttDate" value="${todayISO()}" />
+        <button class="btn-primary sp-edit-att-btn" onclick="openAttEditFromProfile('${s.id}')">✏️ تعديل الحالة</button>
+      </div>
+    </div>` : ''}
+
     <!-- إحصائيات الحضور -->
     <div class="sp-stats-grid">
       <div class="sp-stat sp-stat-present"><div class="sp-stat-num">${presentCnt}</div><div class="sp-stat-lbl">حاضر</div></div>
       <div class="sp-stat sp-stat-absent"><div class="sp-stat-num">${absentCnt}</div><div class="sp-stat-lbl">غائب</div></div>
       <div class="sp-stat sp-stat-late"><div class="sp-stat-num">${lateCnt}</div><div class="sp-stat-lbl">متأخر</div></div>
       <div class="sp-stat sp-stat-excused"><div class="sp-stat-num">${excusedCnt}</div><div class="sp-stat-lbl">بعذر</div></div>
+      <div class="sp-stat sp-stat-exit"><div class="sp-stat-num">${exitCount}</div><div class="sp-stat-lbl">إذن خروج</div></div>
+      ${warnCnt>0?`<div class="sp-stat" style="background:#fef2f2"><div class="sp-stat-num" style="color:#dc2626">${warnCnt}</div><div class="sp-stat-lbl">إنذار</div></div>`:''}
       <div class="sp-stat sp-stat-rate"><div class="sp-stat-num">${attendRate}${attendRate!=='—'?'%':''}</div><div class="sp-stat-lbl">نسبة الحضور</div></div>
     </div>
 
@@ -1751,7 +1849,8 @@ async function viewStudent(id) {
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">
       <div style="font-size:13px;color:var(--text2)">آخر موقع: <strong style="color:var(--primary)">${qpProgress}</strong></div>
       <div style="display:flex;gap:8px">
-        <button class="btn-secondary" style="font-size:12px;padding:5px 12px" onclick="window.open('${API}/reports/quran/student/${s.id}','_blank')">📥 تقرير Excel</button>
+        <button class="btn-secondary" style="font-size:12px;padding:5px 12px" onclick="window.open('${API}/reports/attendance/student/${s.id}','_blank')">📊 سجل الحضور Excel</button>
+        <button class="btn-secondary" style="font-size:12px;padding:5px 12px" onclick="window.open('${API}/reports/quran/student/${s.id}','_blank')">📖 تقرير القرآن Excel</button>
         <button class="btn-secondary" style="font-size:12px;padding:5px 12px" onclick="closeModal('studentDetailModal');openProgressModal('${s.id}')">+ تسجيل تقدم</button>
       </div>
     </div>
@@ -1772,33 +1871,50 @@ async function viewStudent(id) {
       </table>
     </div>` : '<p style="color:var(--text2);font-size:13px;margin-bottom:16px">لا توجد سجلات تقدم قرآني بعد.</p>'}
 
-    <!-- تعديل حضور اليوم من الملف الشخصي -->
-    <div class="section-title">✏️ تعديل حضور اليوم</div>
-    <div class="sp-att-change-box" id="spAttChangeBox_${s.id}">
-      ${_buildAttChangeSectionHTML(s.id, s.classId, history)}
-    </div>
-
     <!-- سجل الحضور -->
     <div class="section-title">📅 سجل الحضور</div>
     ${history.length===0 ? '<p style="color:var(--text2);font-size:13px">لا توجد سجلات بعد.</p>' : `
     <div style="overflow-x:auto">
       <table class="history-table">
-        <thead><tr><th>التاريخ الهجري</th><th>اليوم</th><th>الحالة</th><th>ملاحظات</th></tr></thead>
+        <thead><tr><th>التاريخ الهجري</th><th>اليوم</th><th>الحالة</th><th>ملاحظات</th><th></th></tr></thead>
         <tbody>${history.map(h => `
           <tr>
             <td style="font-family:var(--mono);font-size:12px;direction:rtl">${formatHijri(h.date)}</td>
-            <td>${ARABIC_DAYS[new Date(h.date).getDay()]}</td>
+            <td>${ARABIC_DAYS[new Date(h.date+'T00:00:00').getDay()]}</td>
             <td><span class="badge badge-${badgeClass(h.status)}">${translateStatus(h.status)}</span></td>
-            <td>${h.notes||'—'}</td>
+            <td style="font-size:12px;color:var(--text2)">${h.notes||'—'}</td>
+            <td><button class="btn-icon att-hist-edit-btn" title="تعديل الحضور"
+              onclick="openAttEditModal('${s.id}','${s.classId}',${JSON.stringify(s.name)},'${s.parentPhone||''}','${h.date}','${h.status}','${(h.notes||'')}','${h.id||''}')">✏️</button>
+            </td>
           </tr>`).join('')}
         </tbody>
       </table>
     </div>`}
+    <!-- تعهدات وإنذارات -->
+    <div class="section-title" style="margin-top:4px">📋 تعهدات وإنذارات</div>
+    <div class="sp-notices-toolbar">
+      <button class="btn-secondary" style="font-size:12px" onclick="openNoticeModal('${s.id}','تعهد')">+ تعهد</button>
+      <button class="btn-secondary" style="font-size:12px;color:#dc2626;border-color:#fca5a5" onclick="openNoticeModal('${s.id}','إنذار')">+ إنذار</button>
+      <span class="sp-notice-counts">${pledgeCnt ? `<span class="sp-notice-chip sp-notice-pledge">${pledgeCnt} تعهد</span>` : ''}${warnCnt ? `<span class="sp-notice-chip sp-notice-warn">${warnCnt} إنذار</span>` : ''}</span>
+    </div>
+    ${notices.length ? `
+    <div class="sp-notices-list">
+      ${notices.map(n => `
+      <div class="sp-notice-row">
+        <span class="sp-notice-type-badge ${n.type==='إنذار'?'sp-notice-warn':'sp-notice-pledge'}">${n.type}</span>
+        <span class="sp-notice-date">${formatHijri(n.date)}</span>
+        <span class="sp-notice-reason">${n.reason||'—'}</span>
+        <button class="btn-icon" style="font-size:11px;flex-shrink:0" onclick="deleteNotice('${n.id}','${s.id}')">🗑</button>
+      </div>`).join('')}
+    </div>` : '<p style="color:var(--text2);font-size:13px;margin-bottom:12px">لا توجد تعهدات أو إنذارات.</p>'}
+
+    <!-- زر طباعة الملف -->
+    <div style="display:flex;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+      <button class="btn-secondary" onclick="printStudentProfile('${s.id}')">🖨️ طباعة الملف</button>
+    </div>
   `;
   // init hijri label for quick-leave date
   updateHijriLabel(document.getElementById('spQuickDate'), 'spQuickHijri');
-  // Wire up delegated click handler for attendance change buttons
-  _initAttChangeDelegation(s.id);
   document.getElementById('studentDetailModal').classList.remove('hidden');
 }
 
@@ -2207,6 +2323,24 @@ function downloadReport(type) {
     const hMonth = document.getElementById('rptMonth').value;
     if (!hYear || !hMonth) return toast('اختر الشهر والسنة الهجرية');
     url = `${API}/reports/teacher-monthly/hijri/${hYear}/${hMonth}`;
+  } else if (type==='print-daily-attendance') {
+    const date = document.getElementById('rptDailyDate').value;
+    if (!date) return toast('اختر تاريخًا');
+    url = `${API}/print/daily-attendance/${date}` + (dailyClass ? `?classId=${dailyClass}` : '');
+  } else if (type==='print-teacher-log') {
+    const date = document.getElementById('rptDailyDate').value;
+    if (!date) return toast('اختر تاريخًا');
+    url = `${API}/print/teacher-log/${date}`;
+  } else if (type==='print-monthly') {
+    const hYear  = document.getElementById('rptYear').value;
+    const hMonth = document.getElementById('rptMonth').value;
+    if (!hYear || !hMonth) return toast('اختر الشهر والسنة الهجرية');
+    url = `${API}/print/monthly-attendance/${hYear}/${hMonth}` + (monthlyClass ? `?classId=${monthlyClass}` : '');
+  } else if (type==='print-teacher-monthly') {
+    const hYear  = document.getElementById('rptYear').value;
+    const hMonth = document.getElementById('rptMonth').value;
+    if (!hYear || !hMonth) return toast('اختر الشهر والسنة الهجرية');
+    url = `${API}/print/teacher-monthly/${hYear}/${hMonth}`;
   }
   if (url) { window.open(url,'_blank'); toast('⬇ جارٍ التنزيل…'); }
 }
@@ -2490,14 +2624,28 @@ async function saveLeave() {
   const classId   = document.getElementById('attClass').value;
   if (!studentId) return toast('يرجى اختيار الطالب');
   if (!date)      return toast('يرجى اختيار التاريخ');
-  await apiFetch('/leaves', {
+  const leaveRes = await apiFetch('/leaves', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ studentId, classId, date, type, reason }),
   });
+  // Auto-correct: if student was already marked Absent on that date, change to Excused
+  if (leaveRes?.ok !== false && classId && date) {
+    const existing = await apiFetch(`/attendance?date=${date}&classId=${classId}`);
+    if (existing) {
+      const absentRec = existing.find(a => a.studentId === studentId && a.status === 'Absent');
+      if (absentRec) {
+        const typeLabelsNote = { Sick:'🤒 مرض', Permission:'📋 إذن خروج', Travel:'✈️ سفر', Family:'🚨 ظرف عائلي', Other:'📝 أخرى' };
+        await apiFetch('/attendance/batch', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date, classId, records: [{ studentId, status: 'Excused', notes: typeLabelsNote[type]||type }] }),
+        });
+      }
+    }
+  }
   closeModal('leaveModal');
   await loadAttendanceStudents();
   const typeLabels = { Sick:'مرض', Permission:'إذن خروج', Travel:'سفر', Family:'ظرف عائلي', Other:'أخرى' };
-  toast(`✅ تم تسجيل الإذن: ${typeLabels[type]||type}`);
+  toast(`✅ تم تسجيل الإذن: ${typeLabels[type]||type} — وتحديث الحضور إلى بعذر`);
 }
 
 async function cancelLeave(leaveId, studentId, date, classId) {
@@ -2792,6 +2940,7 @@ async function initWhatsappPage() {
     waLoadQueue(),
     waLoadGroups(),
     waLoadLog(),
+    waLoadScheduled(),
   ]);
   waShowTab('queue');
   waUpdateNavBadge();
@@ -3427,7 +3576,7 @@ function tpToggleMonth(bid) {
 // ══════════════════════════════════════════════════════════════════
 //  إجراء سريع من ملف الطالب — Quick Leave
 // ══════════════════════════════════════════════════════════════════
-async function quickLeave(studentId, classId, type) {
+async function quickLeave(studentId, classId, type, reason = '') {
   const dateEl   = document.getElementById('spQuickDate');
   const resultEl = document.getElementById('spQuickResult');
   const date     = dateEl?.value || todayISO();
@@ -3438,9 +3587,16 @@ async function quickLeave(studentId, classId, type) {
   };
   const label = typeLabels[type] || type;
 
-  if (!classId) {
-    toast('⚠️ الطالب غير مرتبط بحلقة');
-    return;
+  if (!classId) { toast('⚠️ الطالب غير مرتبط بحلقة'); return; }
+
+  // إذن خروج requires the student to already be marked Present
+  if (type === 'Permission') {
+    const todayAtt = await apiFetch(`/attendance?date=${date}&classId=${classId}`);
+    const rec = todayAtt?.find(a => a.studentId === studentId);
+    if (!rec || rec.status !== 'Present') {
+      toast('⚠️ إذن الخروج يُعطى فقط للطلاب الحاضرين. سجّل الحضور أولاً.');
+      return;
+    }
   }
 
   // Highlight selected button briefly
@@ -3448,27 +3604,27 @@ async function quickLeave(studentId, classId, type) {
   event?.target?.closest('.sp-qa-btn')?.classList.add('sp-qa-active');
 
   const res = await apiFetch('/leaves', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ studentId, classId, date, type, reason: '' }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ studentId, classId, date, type, reason }),
   });
 
   if (resultEl) {
     resultEl.className = 'sp-qa-result';
     resultEl.innerHTML = res?.ok !== false
-      ? `✅ تم تسجيل <strong>${label}</strong> بتاريخ ${date}`
+      ? `✅ تم تسجيل <strong>${label}</strong> بتاريخ ${date}${reason ? ' — ' + reason : ''}`
       : `❌ تعذّر التسجيل`;
     resultEl.classList.add(res?.ok !== false ? 'sp-qa-success' : 'sp-qa-error');
+    resultEl.classList.remove('hidden');
     setTimeout(() => {
       resultEl.classList.add('hidden');
       document.querySelectorAll('.sp-qa-btn').forEach(b => b.classList.remove('sp-qa-active'));
-    }, 3000);
+    }, 3500);
   }
 
   toast(res?.ok !== false ? `✅ ${label} — ${date}` : '❌ تعذّر التسجيل');
 
-  // If leave was saved successfully AND student already has an Absent record today → update to Excused
-  if (res?.ok !== false && classId && date) {
+  // For non-Permission: if student already Absent → upgrade to Excused
+  if (res?.ok !== false && classId && date && type !== 'Permission') {
     const existing = await apiFetch(`/attendance?date=${date}&classId=${classId}`);
     if (existing) {
       const absentRec = existing.find(a => a.studentId === studentId && a.status === 'Absent');
@@ -3480,53 +3636,183 @@ async function quickLeave(studentId, classId, type) {
       }
     }
   }
-}
-async function changeStudentAttStatus(studentId, classId, newStatus) {
-  const date        = todayISO();
-  const statusLabels = { Present:'حاضر', Absent:'غائب', Late:'متأخر', Excused:'بعذر' };
-  const statusBadgeMap = { Present:'present', Absent:'absent', Late:'late', Excused:'excused' };
-  const resultEl    = document.getElementById('spAttChangeResult_' + studentId);
 
-  // Preserve existing notes — fetch current record first
+  // Refresh profile if open
+  if (res?.ok !== false) viewStudent(studentId);
+}
+function attEditSelectStatus(btn) {
+  document.querySelectorAll('.att-edit-status-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── Attendance Edit Modal (from student profile history) ──
+let _attEditData = {};
+function openAttEditModal(studentId, classId, studentName, parentPhone, date, currentStatus, notes, recId) {
+  _attEditData = { studentId, classId, studentName, parentPhone, date, recId };
+  document.getElementById('attEditStudentName').textContent = studentName + ' — ' + formatHijri(date);
+  document.getElementById('attEditDate').textContent = formatHijriFull(date);
+  // set active button
+  document.querySelectorAll('.att-edit-status-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.status === currentStatus);
+  });
+  document.getElementById('attEditNotes').value = notes || '';
+  document.getElementById('attEditResult').className = 'sp-qa-result hidden';
+  document.getElementById('attEditResult').textContent = '';
+  document.getElementById('attEditModal').classList.remove('hidden');
+}
+function closeAttEditModal() {
+  document.getElementById('attEditModal').classList.add('hidden');
+}
+
+// ── Open edit modal from student profile date picker ──
+async function openAttEditFromProfile(studentId) {
+  // Look up student from state — avoids encoding names in onclick attributes
+  const s = state.students.find(x => x.id === studentId);
+  if (!s) return toast('لم يُعثر على بيانات الطالب');
+  const classId    = s.classId    || '';
+  const studentName= s.name       || '';
+  const parentPhone= s.parentPhone|| '';
+
+  const dateEl = document.getElementById('spEditAttDate');
+  const date   = dateEl?.value || todayISO();
+  if (!date) return toast('اختر التاريخ أولاً');
+
+  // Fetch current attendance record for that date
+  let currentStatus = 'Absent';
+  let currentNotes  = '';
+  let recId         = '';
+  try {
+    const recs = await apiFetch(`/attendance?date=${date}${classId ? '&classId=' + classId : ''}`);
+    const rec  = recs?.find(a => a.studentId === studentId);
+    if (rec) {
+      currentStatus = rec.status || 'Absent';
+      currentNotes  = rec.notes  || '';
+      recId         = rec.id     || '';
+    }
+  } catch(e) { /* no record yet */ }
+
+  openAttEditModal(studentId, classId, studentName, parentPhone, date, currentStatus, currentNotes, recId);
+}
+async function saveAttEdit() {
+  const newStatus = document.querySelector('.att-edit-status-btn.active')?.dataset.status;
+  if (!newStatus) return toast('اختر الحالة أولاً');
+  const { studentId, classId, date, parentPhone, studentName } = _attEditData;
+  const notes = document.getElementById('attEditNotes').value.trim();
+  const res = await apiFetch('/attendance/batch', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date, classId, records: [{ studentId, status: newStatus, notes }] }),
+  });
+  const ok = res && res.ok !== false;
+  const resultEl = document.getElementById('attEditResult');
+  const statusLabels = { Present:'حاضر', Absent:'غائب', Late:'متأخر', Excused:'بعذر' };
+  if (ok) {
+    resultEl.className = 'sp-qa-result sp-qa-success';
+    resultEl.textContent = '✅ تم تغيير الحالة إلى ' + (statusLabels[newStatus] || newStatus);
+    resultEl.classList.remove('hidden');
+    toast('✅ تم تحديث حضور ' + studentName);
+    // Send WA if changed to Absent
+    if (newStatus === 'Absent' && parentPhone && date === todayISO()) {
+      const s = state.students.find(x => x.id === studentId);
+      if (s) {
+        const cls = state.classes.find(c => c.id === classId);
+        const records = [{ studentId, name: studentName, phone: parentPhone }];
+        apiFetch('/whatsapp/send-bulk', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ records, date, classId }),
+        }).then(r => {
+          if (r?.sent > 0) toast('📱 تم إرسال إشعار الغياب لولي الأمر');
+        });
+      }
+    }
+    setTimeout(() => {
+      closeAttEditModal();
+      viewStudent(studentId); // refresh profile
+    }, 1200);
+  } else {
+    resultEl.className = 'sp-qa-result sp-qa-error';
+    resultEl.textContent = '❌ تعذّر التحديث';
+    resultEl.classList.remove('hidden');
+  }
+}
+
+// ── Edit attendance for a specific date from the history table ──
+function openAttEditForDate(studentId, classId, studentName, date, parentPhone, btnEl) {
+  const row    = btnEl.closest('tr');
+  const panel  = row.querySelector('.att-hist-edit-panel');
+  if (!panel) return;
+
+  // Toggle: close if already open
+  if (!panel.classList.contains('hidden')) {
+    panel.classList.add('hidden');
+    return;
+  }
+  // Close any other open panels first
+  document.querySelectorAll('.att-hist-edit-panel').forEach(p => p.classList.add('hidden'));
+
+  const mkBtn = (st, icon, label, color) =>
+    `<button class="att-hist-status-btn" style="background:${color}" `
+    + `onclick="changeStudentAttStatus('${studentId}','${classId}','${st}','${date}','${studentName}','${parentPhone}',this.closest('tr'))">`
+    + `${icon} ${label}</button>`;
+
+  panel.innerHTML = `<div class="att-hist-edit-row">
+    ${mkBtn('Present','✅','حاضر','#dcfce7')}
+    ${mkBtn('Late','⏱','متأخر','#fef3c7')}
+    ${mkBtn('Absent','❌','غائب','#fee2e2')}
+    ${mkBtn('Excused','📋','بعذر (إذن)','#ede9fe')}
+    ${mkBtn('Sick','🤒','مريض','#fce7f3')}
+    ${mkBtn('Emergency','🚨','طارئ','#fff1f2')}
+  </div>`;
+  panel.classList.remove('hidden');
+}
+
+async function changeStudentAttStatus(studentId, classId, newStatus, date, studentName, parentPhone, rowEl) {
+  if (!date) date = todayISO();
+  const statusLabels = { Present:'حاضر', Absent:'غائب', Late:'متأخر', Excused:'بعذر (إذن)', Sick:'مريض', Emergency:'طارئ' };
+  const badgeMap     = { Present:'present', Absent:'absent', Late:'late', Excused:'excused', Sick:'excused', Emergency:'absent' };
+
+  // Map Sick/Emergency → Excused in the DB (they're sub-types, visually distinct)
+  const dbStatus = (newStatus === 'Sick' || newStatus === 'Emergency') ? 'Excused' : newStatus;
+  const notes    = newStatus === 'Sick' ? 'مرض' : newStatus === 'Emergency' ? 'طارئ' : '';
+
   const existing = await apiFetch('/attendance?date=' + date + (classId ? '&classId=' + classId : ''));
-  const existingRec = existing ? existing.find(a => a.studentId === studentId) : null;
-  const notes = existingRec?.notes || '';
+  const existingRec = existing?.find(a => a.studentId === studentId);
+  const finalNotes = notes || existingRec?.notes || '';
 
   const res = await apiFetch('/attendance/batch', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ date, classId, records: [{ studentId, status: newStatus, notes }] }),
+    body: JSON.stringify({ date, classId, records: [{ studentId, status: dbStatus, notes: finalNotes }] }),
   });
 
   const ok = res && res.ok !== false;
+  if (!ok) { toast('❌ تعذّر التغيير'); return; }
 
-  if (resultEl) {
-    resultEl.className = 'sp-qa-result ' + (ok ? 'sp-qa-success' : 'sp-qa-error');
-    resultEl.textContent = ok
-      ? '✅ تم تغيير الحالة إلى ' + (statusLabels[newStatus] || newStatus)
-      : '❌ تعذّر التغيير — تأكد من الاتصال';
-    resultEl.classList.remove('hidden');
-    setTimeout(() => resultEl.classList.add('hidden'), 4000);
+  // Update badge in the table row
+  if (rowEl) {
+    const badge = rowEl.querySelector('.badge');
+    if (badge) {
+      badge.className = 'badge badge-' + (badgeMap[newStatus] || 'default');
+      badge.textContent = statusLabels[newStatus] || newStatus;
+    }
+    const panel = rowEl.querySelector('.att-hist-edit-panel');
+    if (panel) panel.classList.add('hidden');
   }
 
-  if (ok) {
-    // Update button highlights in the box
-    const box = document.getElementById('spAttChangeBox_' + studentId);
-    if (box) {
-      box.querySelectorAll('.sp-att-btn').forEach(b => b.classList.remove('active'));
-      const targetBtn = box.querySelector('[data-status="' + newStatus + '"]');
-      if (targetBtn) targetBtn.classList.add('active');
-      const statusEl = box.querySelector('.sp-att-today-status');
-      if (statusEl) {
-        const badgeClass = statusBadgeMap[newStatus] || 'default';
-        statusEl.innerHTML = '<span>حالة اليوم: </span>'
-          + '<span class="badge badge-' + badgeClass + '">' + (statusLabels[newStatus] || newStatus) + '</span>';
-      }
-    }
-    toast('✅ ' + (statusLabels[newStatus] || newStatus) + ' — تم التحديث');
-    _leaveStudentIds.delete(studentId);
+  toast('✅ تم التغيير إلى: ' + (statusLabels[newStatus] || newStatus));
+
+  // If changed to Absent → send WA to guardian
+  if (newStatus === 'Absent' && parentPhone) {
+    const cls = state.classes.find(c => c.id === classId);
+    const waRes = await apiFetch('/whatsapp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: parentPhone, studentName, className: cls?.name || '', date }),
+    });
+    if (waRes?.ok) toast('📱 تم إرسال إشعار الغياب على واتساب');
+    else           toast('⚠️ تغيّرت الحالة لكن تعذّر إرسال واتساب');
   }
 }
+
 async function waDismissItem(attendanceId, studentId, date) {
   const res = await apiFetch('/whatsapp/queue/dismiss', {
     method: 'POST',
@@ -3715,6 +4001,36 @@ function _renderSummaryBar(dates, holidaySet) {
 }
 
 /* ── Hijri Helpers ──────────────────────────────────────────────── */
+// Expand a repeating event into all matching dates within a given date range
+function _expandRepeatEvent(ev, dates) {
+  if (!ev.repeat) return [];
+  const result = [];
+  const origin = new Date(ev.date + 'T00:00:00');
+  const originDow = origin.getDay(); // day-of-week for weekly
+
+  dates.forEach(iso => {
+    if (iso <= ev.date) return; // don't re-add the original date
+    const d = new Date(iso + 'T00:00:00');
+    if (ev.repeat === 'weekly' && d.getDay() === originDow) {
+      result.push({ ...ev, id: ev.id + '_r_' + iso, date: iso, _isRepeat: true });
+    } else if (ev.repeat === 'monthly') {
+      // Same Hijri day, any future month
+      const h = toHijri(iso);
+      const hOrigin = toHijri(ev.date);
+      if (h.day === hOrigin.day && iso > ev.date) {
+        result.push({ ...ev, id: ev.id + '_r_' + iso, date: iso, _isRepeat: true });
+      }
+    } else if (ev.repeat === 'yearly') {
+      const h = toHijri(iso);
+      const hOrigin = toHijri(ev.date);
+      if (h.day === hOrigin.day && h.month === hOrigin.month && iso > ev.date) {
+        result.push({ ...ev, id: ev.id + '_r_' + iso, date: iso, _isRepeat: true });
+      }
+    }
+  });
+  return result;
+}
+
 function _buildHijriMonthDates(hy, hm) {
   const dates = [];
   for (let d=1;d<=30;d++) {
@@ -3748,13 +4064,18 @@ function _renderCalGrid(dates, holidaySet) {
   if (!grid) return;
   const today = todayISO();
 
-  // Build event map (date → events), expand ranges
+  // Build event map (date → events), expand ranges and repeats
   const evMap = {};
   const filtered = _calFilter==='all' ? _calEvents : _calEvents.filter(e=>e.type===_calFilter);
+  const allEventsForGrid = [];
   filtered.forEach(e => {
+    allEventsForGrid.push(e);
+    _expandRepeatEvent(e, dates).forEach(r => allEventsForGrid.push(r));
+  });
+  allEventsForGrid.forEach(e => {
     const addTo = iso => { if(!evMap[iso]) evMap[iso]=[]; evMap[iso].push(e); };
     addTo(e.date);
-    if (e.endDate && e.endDate!==e.date) {
+    if (e.endDate && e.endDate!==e.date && !e._isRepeat) {
       let d=new Date(e.date+'T00:00:00'), end=new Date(e.endDate+'T00:00:00');
       d.setDate(d.getDate()+1);
       while(d<=end) { addTo(d.toISOString().split('T')[0]); d.setDate(d.getDate()+1); }
@@ -3825,9 +4146,14 @@ function _renderAgenda() {
   });
   const filtered = _calFilter==='all' ? _calAllEvents : _calAllEvents.filter(e=>e.type===_calFilter);
   filtered.forEach(e=>{
-    if(new Date(e.date+'T00:00:00').getDay()===5) return; // skip Fridays
+    if(new Date(e.date+'T00:00:00').getDay()===5) return;
     if(e.date>=startISO&&e.date<=endISO) items.push({...e,iso:e.date});
     else if(e.endDate&&e.endDate>=startISO&&e.date<=endISO) items.push({...e,iso:e.date});
+    // Expand repeating events into this month
+    _expandRepeatEvent(e, dates).forEach(r => {
+      if(new Date(r.date+'T00:00:00').getDay()===5) return;
+      items.push({...r,iso:r.date});
+    });
   });
   items.sort((a,b)=>{
     const dc=a.iso.localeCompare(b.iso);
@@ -3955,7 +4281,11 @@ function calAddEventForDay() {
 }
 
 /* ── Event Modal ────────────────────────────────────────────────── */
-async function openCalEventModal(id=null, prefillDate=null) {
+// _calWaMode = true when the modal is opened from the WA tab (locks to message type only)
+let _calWaMode = false;
+
+async function openCalEventModal(id=null, prefillDate=null, prefillType=null, waMode=false) {
+  _calWaMode = waMode;
   _calWaRows=[]; _calSelType='event'; _calSelColor='#2563EB';
   _specificDates = [];
   const fields=['calEventId','calEventTitle','calEventDate','calEventEndDate','calEventTime','calEventNote','calWaMessage'];
@@ -3976,10 +4306,22 @@ async function openCalEventModal(id=null, prefillDate=null) {
   document.querySelectorAll('.cal-type-btn').forEach(b=>b.classList.toggle('active',b.dataset.type==='event'));
   document.querySelectorAll('.cal-color-btn').forEach(b=>b.classList.toggle('active',b.dataset.color==='#2563EB'));
 
+  // WA mode: hide type selector, show banner, lock to message
+  const typeSection = document.getElementById('calTypeSection');
+  const waBanner    = document.getElementById('calWaModeBanner');
+  if (waMode) {
+    typeSection?.classList.add('hidden');
+    waBanner?.classList.remove('hidden');
+  } else {
+    typeSection?.classList.remove('hidden');
+    waBanner?.classList.add('hidden');
+  }
+
   if(id){
-    const ev=_calAllEvents.find(e=>e.id===id);
+    // Try local cache first, then fetch from server
+    const ev = _calAllEvents.find(e=>e.id===id) || (await apiFetch('/calendar'))?.find(e=>e.id===id);
     if(ev){
-      document.getElementById('calEventModalTitle').textContent='تعديل الحدث';
+      document.getElementById('calEventModalTitle').textContent = waMode ? 'تعديل الرسالة المجدولة' : 'تعديل الحدث';
       document.getElementById('calEventId').value    = ev.id;
       document.getElementById('calEventTitle').value = ev.title||'';
       document.getElementById('calEventDate').value  = ev.date||'';
@@ -3996,7 +4338,8 @@ async function openCalEventModal(id=null, prefillDate=null) {
       document.querySelectorAll('.cal-color-btn').forEach(b=>b.classList.toggle('active',b.dataset.color===_calSelColor));
     }
   } else {
-    document.getElementById('calEventModalTitle').textContent='إضافة حدث';
+    document.getElementById('calEventModalTitle').textContent = waMode ? 'رسالة واتساب جديدة' : 'إضافة حدث';
+    if (waMode || prefillType) calSelectType(waMode ? 'message' : prefillType);
   }
   document.getElementById('calEventModal').classList.remove('hidden');
 }
@@ -4138,19 +4481,9 @@ function calRemoveSpecificDay(iso) {
   _renderSpecificChips();
 }
 
-function calSetTime(val) {
-  const el = document.getElementById('calEventTime');
-  if (el) el.value = val;
-  calSyncTimePicker();
-}
-function calSyncTimePicker() {
-  const val = document.getElementById('calEventTime')?.value || '';
-  document.querySelectorAll('.time-quick-btn').forEach(b => {
-    b.classList.toggle('active', b.getAttribute('onclick').includes(`'${val}'`));
-  });
-}
-
 function calSelectType(type){
+  // In WA mode, always force message type regardless of what was passed
+  if (_calWaMode) type = 'message';
   _calSelType=type;
   document.querySelectorAll('.cal-type-btn').forEach(b=>b.classList.toggle('active',b.dataset.type===type));
   _calSelColor=CAL_TYPE_COLOR[type]||'#2563EB';
@@ -4202,8 +4535,28 @@ async function saveCalEvent(){
   const date=document.getElementById('calEventDate').value;
   if(!title) { _calSaving=false; if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='حفظ';} return toast('يرجى إدخال عنوان الحدث'); }
   if(!date)  { _calSaving=false; if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='حفظ';} return toast('يرجى اختيار التاريخ'); }
+  // Warn if message type but past date
+  if(_calSelType==='message' && date < todayISO()) {
+    if(!confirm(`تاريخ الرسالة (${date}) في الماضي — لن تُرسَل. هل تريد الحفظ فقط بدون إرسال؟`)) {
+      _calSaving=false; if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='حفظ';} return;
+    }
+  }
+  // Warn if message type but no recipients
+  if(_calSelType==='message') {
+    // Sync first
+    document.querySelectorAll('#calWaRecipients .cal-wa-row').forEach((row,i)=>{
+      if(!_calWaRows[i]) _calWaRows[i] = {};
+      _calWaRows[i].phone = row.querySelector('.cal-wa-phone')?.value?.trim() || '';
+    });
+    const validTargets = _calWaRows.filter(r=>r.phone);
+    if(!validTargets.length) { _calSaving=false; if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='حفظ';} return toast('⚠️ أضف مستلماً واحداً على الأقل للرسالة'); }
+    if(!document.getElementById('calWaMessage').value.trim()) { _calSaving=false; if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='حفظ';} return toast('⚠️ أدخل نص الرسالة'); }
+  }
+  // Sync inputs BEFORE reading _calWaRows — catches values typed without blur
   document.querySelectorAll('#calWaRecipients .cal-wa-row').forEach((row,i)=>{
-    if(_calWaRows[i]){ _calWaRows[i].name=row.querySelector('.cal-wa-name')?.value?.trim()||''; _calWaRows[i].phone=row.querySelector('.cal-wa-phone')?.value?.trim()||''; }
+    if(!_calWaRows[i]) _calWaRows[i] = {};
+    _calWaRows[i].name  = row.querySelector('.cal-wa-name')?.value?.trim()  || '';
+    _calWaRows[i].phone = row.querySelector('.cal-wa-phone')?.value?.trim() || '';
   });
   const useSpecific = _calSelType==='message' && !!(document.getElementById('calUseSpecificDays')?.checked) && _specificDates.length > 0;
   const dailyRepeat = _calSelType==='message' && !useSpecific && !!(document.getElementById('calDailyRepeat')?.checked);
@@ -4222,8 +4575,15 @@ async function saveCalEvent(){
     waTargets:     _calSelType==='message'?_calWaRows.filter(r=>r.phone):null,
   };
   if(id){
-    await apiFetch(`/calendar/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-    toast('✅ تم تحديث الحدث');
+    const r = await apiFetch(`/calendar/${id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    if (payload.type === 'message' && payload.waTargets?.length) {
+      const sr = r?.scheduleResult;
+      if (sr?.ok)    toast(`✅ تم تحديث الحدث وإعادة جدولة الرسالة على Fonnte`);
+      else if (sr)   toast(`⚠️ تم تحديث الحدث لكن فشل إعادة الجدولة: ${sr.error||'تحقق من الـ Token'}`);
+      else           toast('✅ تم تحديث الحدث');
+    } else {
+      toast('✅ تم تحديث الحدث');
+    }
   } else {
     const r = await apiFetch('/calendar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     if((dailyRepeat || useSpecific) && r?.ids?.length>1) {
@@ -4244,7 +4604,8 @@ async function saveCalEvent(){
   closeModal('calEventModal');
   await loadAll();
   renderCalendar();
-  refreshNotifBadge(); // update bell in case new scheduled messages were added
+  refreshNotifBadge();
+  _waMaybeRefreshScheduled(); // refresh WA scheduled tab if open
   } finally {
     _calSaving = false;
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'حفظ'; }
@@ -4554,4 +4915,647 @@ async function saveWeekOff() {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '✅ جدولة الإجازة'; }
   }
+}
+
+// ════════════════════════════════════════════════════════
+//  نسخ احتياطي وإعادة ضبط البيانات
+// ════════════════════════════════════════════════════════
+
+const RESET_LABELS = {
+  attendance: '✅ سجل حضور الطلاب',
+  teacherLog: '⏱ حضور المعلمين والإداريين',
+  quran:      '📖 تقدم القرآن الكريم',
+  waLog:      '💬 سجل رسائل واتساب',
+  calendar:   '🗓️ أحداث التقويم',
+  holidays:   '📅 الإجازات الرسمية',
+  students:   '👥 الطلاب',
+  teachers:   '👨‍🏫 المعلمون',
+  classes:    '🏫 الحلقات',
+};
+
+function resetGetSelected() {
+  return [...document.querySelectorAll('.reset-cb:checked')].map(cb => cb.dataset.key);
+}
+
+function resetUpdateCount() {
+  const selected = resetGetSelected();
+  const countEl  = document.getElementById('resetSelCount');
+  const btn      = document.getElementById('resetConfirmBtn');
+  if (countEl) countEl.textContent = selected.length ? `تم اختيار ${selected.length} عنصر` : '';
+  if (btn)     btn.disabled = selected.length === 0;
+}
+
+function resetSelectAll() {
+  document.querySelectorAll('.reset-cb').forEach(cb => { cb.checked = true; });
+  resetUpdateCount();
+}
+
+function resetClearAll() {
+  document.querySelectorAll('.reset-cb').forEach(cb => { cb.checked = false; });
+  resetUpdateCount();
+}
+
+function openResetConfirmModal() {
+  const selected = resetGetSelected();
+  if (!selected.length) return;
+  const listEl = document.getElementById('resetConfirmList');
+  if (listEl) {
+    listEl.innerHTML = selected.map(k => `<div>🔴 ${RESET_LABELS[k] || k}</div>`).join('');
+  }
+  document.getElementById('resetConfirmModal').classList.remove('hidden');
+}
+
+async function executeReset() {
+  const selected = resetGetSelected();
+  if (!selected.length) return;
+  closeModal('resetConfirmModal');
+
+  const body = {};
+  selected.forEach(k => body[k] = true);
+
+  const statusEl = document.getElementById('resetStatus');
+  if (statusEl) { statusEl.textContent = '⏳ جارٍ الحذف…'; statusEl.className = 'status-msg'; }
+
+  const res = await apiFetch('/settings/reset', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (res?.ok) {
+    const labels = (res.cleared || selected).map(k => RESET_LABELS[k] || k).join('، ');
+    if (statusEl) { statusEl.textContent = `✅ تم الحذف بنجاح: ${labels}`; statusEl.className = 'status-msg status-success'; }
+    toast('✅ تم الحذف بنجاح');
+    resetClearAll();
+    // Reload state
+    await loadData();
+    renderStudentList?.();
+    renderCheckinList?.();
+  } else {
+    if (statusEl) { statusEl.textContent = '❌ تعذّر الحذف — حاول مرة أخرى'; statusEl.className = 'status-msg status-error'; }
+    toast('❌ تعذّر الحذف');
+  }
+}
+
+function openFullResetModal() {
+  const inp = document.getElementById('fullResetConfirmInput');
+  if (inp) inp.value = '';
+  document.getElementById('fullResetModal').classList.remove('hidden');
+}
+
+async function executeFullReset() {
+  const inp = document.getElementById('fullResetConfirmInput');
+  if (!inp || inp.value.trim() !== 'حذف') {
+    toast('⚠️ اكتب كلمة "حذف" للتأكيد');
+    inp?.focus();
+    return;
+  }
+  closeModal('fullResetModal');
+
+  const statusEl = document.getElementById('resetStatus');
+  if (statusEl) { statusEl.textContent = '⏳ جارٍ إعادة الضبط…'; statusEl.className = 'status-msg'; }
+
+  const res = await apiFetch('/settings/reset', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ everything: true }),
+  });
+
+  if (res?.ok) {
+    if (statusEl) { statusEl.textContent = '✅ تمت إعادة الضبط الكاملة بنجاح'; statusEl.className = 'status-msg status-success'; }
+    toast('✅ تمت إعادة الضبط الكاملة');
+    await loadData();
+    renderStudentList?.();
+    renderCheckinList?.();
+    navigate('dashboard');
+  } else {
+    if (statusEl) { statusEl.textContent = '❌ تعذّرت إعادة الضبط'; statusEl.className = 'status-msg status-error'; }
+    toast('❌ تعذّرت إعادة الضبط');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  تنسيق التاريخ — بناء وحفظ
+// ════════════════════════════════════════════════════════
+
+// ── Date Format Builder ──────────────────────────────────
+
+function dfDefaultFormat() {
+  return {
+    tokens: [
+      { key: 'day',   label: 'اليوم',  on: true },
+      { key: 'month', label: 'الشهر',  on: true },
+      { key: 'year',  label: 'السنة',  on: true },
+    ],
+    sep: ' '
+  };
+}
+
+function dfGetCurrentFormat() {
+  const list = document.getElementById('dfTokenList');
+  if (!list) return dfDefaultFormat();
+  const tokens = [...list.querySelectorAll('.df-token')].map(el => ({
+    key:   el.dataset.key,
+    label: el.dataset.label,
+    on:    el.classList.contains('df-token-on'),
+  }));
+  const activeBtn = document.querySelector('.df-sep-btn.active');
+  const sep = activeBtn ? activeBtn.dataset.sep : ' ';
+  return { tokens, sep };
+}
+
+function dfRenderTokens(fmt) {
+  const list = document.getElementById('dfTokenList');
+  if (!list) return;
+  list.innerHTML = '';
+  fmt.tokens.forEach((t, i) => {
+    const total = fmt.tokens.length;
+    const el = document.createElement('div');
+    el.className = 'df-token' + (t.on ? ' df-token-on' : '');
+    el.dataset.key   = t.key;
+    el.dataset.label = t.label;
+    el.innerHTML = `
+      <div class="df-token-arrows">
+        <button class="df-arrow-btn" onclick="dfMoveToken(this,-1)" ${i===0?'disabled':''}>▲</button>
+        <button class="df-arrow-btn" onclick="dfMoveToken(this,1)"  ${i===total-1?'disabled':''}>▼</button>
+      </div>
+      <span class="df-token-label">${t.label}</span>
+      <button class="df-token-toggle" onclick="dfToggleToken(this)">
+        <span class="df-toggle-track"><span class="df-toggle-thumb"></span></span>
+      </button>`;
+    list.appendChild(el);
+  });
+  dfUpdatePreview();
+}
+
+function dfMoveToken(btn, dir) {
+  const token = btn.closest('.df-token');
+  const list  = document.getElementById('dfTokenList');
+  const items = [...list.children];
+  const idx   = items.indexOf(token);
+  const swap  = items[idx + dir];
+  if (!swap) return;
+  if (dir === -1) list.insertBefore(token, swap);
+  else            list.insertBefore(swap, token);
+  // Re-render arrows to update disabled state
+  const newItems = [...list.children];
+  newItems.forEach((el, i) => {
+    const btns = el.querySelectorAll('.df-arrow-btn');
+    if (btns[0]) btns[0].disabled = i === 0;
+    if (btns[1]) btns[1].disabled = i === newItems.length - 1;
+  });
+  dfUpdatePreview();
+}
+
+function dfToggleToken(btn) {
+  const token = btn.closest('.df-token');
+  token.classList.toggle('df-token-on');
+  dfUpdatePreview();
+}
+
+function dfPickSep(btn) {
+  document.querySelectorAll('.df-sep-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  dfUpdatePreview();
+}
+
+function dfSetActiveSep(sep) {
+  document.querySelectorAll('.df-sep-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.sep === sep);
+  });
+}
+
+function dfUpdatePreview() {
+  const preview = document.getElementById('dfPreview');
+  if (!preview) return;
+  const fmt = dfGetCurrentFormat();
+  preview.innerHTML = buildHijriDateString(fmt.tokens, fmt.sep);
+}
+
+function dfReset() {
+  dfRenderTokens(dfDefaultFormat());
+  dfSetActiveSep(' ');
+}
+
+async function saveDateFormat() {
+  const fmt = dfGetCurrentFormat();
+  const statusEl = document.getElementById('dfStatus');
+  await apiFetch('/settings', {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dateFormat: fmt }),
+  });
+  if (!state.settings) state.settings = {};
+  state.settings.dateFormat = fmt;
+  updateTodayBadge(fmt);
+  if (statusEl) {
+    statusEl.textContent = '✅ تم حفظ التنسيق';
+    statusEl.style.color = 'var(--success)';
+    setTimeout(() => statusEl.textContent = '', 2500);
+  }
+  toast('✅ تم حفظ تنسيق التاريخ');
+}
+
+// ════════════════════════════════════════════════════════
+//  واتساب — تبويب الرسائل المجدولة
+// ════════════════════════════════════════════════════════
+
+let _waSchedData = [];
+
+async function waLoadScheduled() {
+  const data = await apiFetch('/calendar');
+  _waSchedData = (data || []).filter(e => e.type === 'message');
+  waRenderScheduled();
+}
+
+function waRenderScheduled() {
+  const list = document.getElementById('waSchedList');
+  if (!list) return;
+
+  const today  = todayISO();
+  const all    = [..._waSchedData].sort((a, b) => a.date.localeCompare(b.date));
+  // "Sent" = date is past AND fonnteScheduled has IDs (Fonnte already delivered it)
+  const upcoming = all.filter(ev => ev.date >= today);
+  const sent     = all.filter(ev => ev.date < today && ev.fonnteScheduled?.length);
+
+  // Render mini calendar of upcoming messages
+  const miniCal = _buildWaSchedMiniCal(upcoming);
+
+  const cardHTML = (ev, isSent) => {
+    const statusIcon = isSent ? '✅ أُرسلت' : (ev.fonnteScheduled?.length ? '🕐 مجدول' : '⏳ في الانتظار');
+    const targets = (ev.waTargets || []).length;
+    return `
+    <div class="wa-sched-card${isSent?' wa-sched-card-sent':''}">
+      <div class="wa-sched-card-top">
+        <div class="wa-sched-info">
+          <div class="wa-sched-title">${ev.title || '—'}</div>
+          <div class="wa-sched-meta">
+            📅 ${formatHijri(ev.date)}${ev.time ? ' · ⏰ ' + ev.time : ''} · 📱 ${targets} مستلم
+          </div>
+          <div class="wa-sched-msg">${(ev.waMessage||'').slice(0,80)}${ev.waMessage?.length>80?'…':''}</div>
+        </div>
+        <span class="wa-sched-badge">${statusIcon}</span>
+      </div>
+      <div class="wa-sched-actions">
+        ${isSent ? '' : `<button class="btn-secondary" style="font-size:12px" onclick="waEditScheduled('${ev.id}')">✏️ تعديل</button>`}
+        <button class="btn-danger" style="font-size:12px;padding:6px 12px" onclick="waDeleteScheduled('${ev.id}')">🗑 حذف</button>
+      </div>
+    </div>`;
+  };
+
+  let html = miniCal;
+
+  if (!upcoming.length && !sent.length) {
+    html += '<div class="info-banner">لا توجد رسائل مجدولة. اضغط «رسالة جديدة» للإضافة.</div>';
+  } else {
+    if (upcoming.length) {
+      html += `<div class="wa-sched-section-title">📅 قادمة (${upcoming.length})</div>`;
+      html += upcoming.map(ev => cardHTML(ev, false)).join('');
+    }
+    if (sent.length) {
+      html += `<div class="wa-sched-section-title wa-sched-sent-hdr">✅ أُرسلت (${sent.length})</div>`;
+      html += sent.map(ev => cardHTML(ev, true)).join('');
+    }
+  }
+  list.innerHTML = html;
+}
+
+function _buildWaSchedMiniCal(events) {
+  if (!events.length) return '';
+  const today = todayISO();
+  // Use current Gregorian month/year
+  const now   = new Date();
+  const year  = now.getFullYear(), month = now.getMonth();
+  const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthName = now.toLocaleDateString('ar-SA', { month: 'long', year: 'numeric' });
+
+  // Build set of dates with events
+  const evDates = new Set(events.map(e => e.date));
+
+  let cells = '';
+  // Empty cells before first day
+  for (let i = 0; i < firstDay; i++) cells += '<div class="wmc-cell wmc-empty"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const hasEv = evDates.has(iso);
+    const isToday = iso === today;
+    const cls = ['wmc-cell', hasEv?'wmc-has-ev':'', isToday?'wmc-today':''].filter(Boolean).join(' ');
+    cells += `<div class="${cls}" title="${hasEv ? events.filter(e=>e.date===iso).map(e=>e.title).join('، ') : ''}">${d}${hasEv?'<span class="wmc-dot"></span>':''}</div>`;
+  }
+  const dayNames = ['أح','اث','ث','أر','خ','ج','س'];
+  return `
+  <div class="wmc-wrap">
+    <div class="wmc-title">📅 ${monthName}</div>
+    <div class="wmc-dow">${dayNames.map(d=>`<div>${d}</div>`).join('')}</div>
+    <div class="wmc-grid">${cells}</div>
+  </div>`;
+}
+
+function waOpenNewScheduled() {
+  openCalEventModal(null, null, null, true);  // waMode=true locks to message type
+}
+
+function waEditScheduled(id) {
+  openCalEventModal(id, null, null, true);    // waMode=true even when editing
+}
+
+async function waDeleteScheduled(id) {
+  const ev = _waSchedData.find(e => e.id === id);
+  if (!ev) return;
+  const label = ev.groupId
+    ? `هذه الرسالة جزء من سلسلة. حذف السلسلة كاملة؟`
+    : `هل تريد حذف رسالة "${ev.title}"؟`;
+  if (!confirm(label)) return;
+  const url = ev.groupId ? `/calendar/${id}?all=1` : `/calendar/${id}`;
+  await apiFetch(url, { method: 'DELETE' });
+  toast('🗑 تم حذف الرسالة المجدولة');
+  await waLoadScheduled();
+}
+
+// Refresh scheduled list after saving a calendar event (called from saveCalEvent)
+async function _waMaybeRefreshScheduled() {
+  if (document.getElementById('waTab-scheduled') &&
+      !document.getElementById('waTab-scheduled').classList.contains('hidden')) {
+    await waLoadScheduled();
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  الطلاب — الحذف الجماعي
+// ════════════════════════════════════════════════════════
+
+let _studentBulkMode     = false;
+let _studentBulkSelected = new Set();
+
+function studentToggleBulkMode() {
+  _studentBulkMode = !_studentBulkMode;
+  _studentBulkSelected.clear();
+  const btn     = document.getElementById('studentBulkToggleBtn');
+  const bar     = document.getElementById('studentBulkBar');
+  if (btn) btn.textContent = _studentBulkMode ? '✕ إلغاء التحديد' : '☑ تحديد';
+  bar?.classList.toggle('hidden', !_studentBulkMode);
+  renderStudentList();
+}
+
+function studentBulkToggle(id) {
+  if (_studentBulkSelected.has(id)) _studentBulkSelected.delete(id);
+  else _studentBulkSelected.add(id);
+  _studentBulkUpdateCount();
+  // Re-render just the card state to avoid full re-render flicker
+  const card = document.querySelector(`.list-card[data-student-id="${id}"]`);
+  if (card) {
+    card.classList.toggle('list-card-selected', _studentBulkSelected.has(id));
+    const cb = card.querySelector('.bulk-checkbox');
+    if (cb) cb.textContent = _studentBulkSelected.has(id) ? '☑' : '☐';
+  }
+}
+
+function studentBulkSelectAll() {
+  const search  = document.getElementById('studentSearch')?.value?.toLowerCase() || '';
+  const classId = document.getElementById('studentClassFilter')?.value || '';
+  let students  = state.students;
+  if (search)  students = students.filter(s => s.name.toLowerCase().includes(search) || (s.studentId||'').toLowerCase().includes(search));
+  if (classId) students = students.filter(s => s.classId === classId);
+  students.forEach(s => _studentBulkSelected.add(s.id));
+  _studentBulkUpdateCount();
+  renderStudentList();
+}
+
+function studentBulkClearAll() {
+  _studentBulkSelected.clear();
+  _studentBulkUpdateCount();
+  renderStudentList();
+}
+
+function _studentBulkUpdateCount() {
+  const n = _studentBulkSelected.size;
+  const countEl = document.getElementById('studentBulkCount');
+  const delBtn  = document.getElementById('studentBulkDeleteBtn');
+  if (countEl) countEl.textContent = `${n} محدد`;
+  if (delBtn)  delBtn.disabled = n === 0;
+}
+
+async function studentBulkDelete() {
+  const ids = [..._studentBulkSelected];
+  if (!ids.length) return;
+  const names = ids.map(id => state.students.find(s => s.id === id)?.name || id).join('، ');
+  if (!confirm(`سيتم حذف ${ids.length} طالب نهائياً:\n${names.slice(0,200)}${names.length>200?'…':''}\n\nهل أنت متأكد؟`)) return;
+
+  // Delete sequentially
+  let done = 0;
+  for (const id of ids) {
+    await apiFetch(`/students/${id}`, { method: 'DELETE' });
+    done++;
+  }
+  toast(`🗑 تم حذف ${done} طالب`);
+  _studentBulkSelected.clear();
+  _studentBulkMode = false;
+  const btn = document.getElementById('studentBulkToggleBtn');
+  const bar = document.getElementById('studentBulkBar');
+  if (btn) btn.textContent = '☑ تحديد';
+  bar?.classList.add('hidden');
+  await loadAll();
+  renderStudentList();
+}
+
+// ════════════════════════════════════════════════════════
+//  إذن الخروج — منح الإذن من ملف الطالب
+// ════════════════════════════════════════════════════════
+async function grantExitPermit(studentId, classId) {
+  const noteEl = document.getElementById('spExitNote');
+  const reason = noteEl?.value?.trim() || '';
+  const date   = document.getElementById('spQuickDate')?.value || todayISO();
+
+  // Double-check student is Present
+  const att = await apiFetch(`/attendance?date=${date}&classId=${classId}`);
+  const rec = att?.find(a => a.studentId === studentId);
+  if (!rec || rec.status !== 'Present') {
+    toast('⚠️ الطالب غير حاضر — لا يمكن منح إذن الخروج');
+    return;
+  }
+
+  const now  = new Date();
+  const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  const res = await apiFetch('/leaves', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ studentId, classId, date, type: 'Permission', reason, time }),
+  });
+
+  if (res?.ok !== false) {
+    toast(`✅ تم منح إذن الخروج — ${time}${reason ? ' | ' + reason : ''}`);
+    if (noteEl) noteEl.value = '';
+    viewStudent(studentId); // refresh profile to show updated count
+  } else {
+    toast('❌ تعذّر تسجيل إذن الخروج');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  تعهدات وإنذارات
+// ════════════════════════════════════════════════════════
+
+let _noticeStudentId = null;
+
+function openNoticeModal(studentId, type) {
+  _noticeStudentId = studentId;
+  document.getElementById('noticeType').value   = type;
+  document.getElementById('noticeDate').value   = todayISO();
+  document.getElementById('noticeReason').value = '';
+  updateHijriLabel(document.getElementById('noticeDate'), 'noticeHijri');
+  document.getElementById('noticeModal').classList.remove('hidden');
+}
+
+async function saveNotice() {
+  const type   = document.getElementById('noticeType').value;
+  const date   = document.getElementById('noticeDate').value;
+  const reason = document.getElementById('noticeReason').value.trim();
+  if (!_noticeStudentId || !date) return;
+  await apiFetch('/notices', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ studentId: _noticeStudentId, type, date, reason }),
+  });
+  closeModal('noticeModal');
+  toast(`✅ تم تسجيل ${type}`);
+  viewStudent(_noticeStudentId);
+}
+
+async function deleteNotice(noticeId, studentId) {
+  if (!confirm('هل تريد حذف هذا السجل؟')) return;
+  await apiFetch(`/notices/${noticeId}`, { method: 'DELETE' });
+  toast('🗑 تم الحذف');
+  viewStudent(studentId);
+}
+
+// ════════════════════════════════════════════════════════
+//  طباعة ملف الطالب
+// ════════════════════════════════════════════════════════
+
+async function printStudentProfile(studentId) {
+  const s = await apiFetch(`/students/${studentId}`);
+  if (!s) return;
+  _printStudentProfiles([s]);
+}
+
+async function studentBulkPrint() {
+  const ids = [..._studentBulkSelected];
+  if (!ids.length) return;
+  toast('⏳ جارٍ تحضير الملفات…');
+  const profiles = await Promise.all(ids.map(id => apiFetch(`/students/${id}`)));
+  _printStudentProfiles(profiles.filter(Boolean));
+}
+
+function _printStudentProfiles(students) {
+  const school = state.settings?.schoolName || 'حضور الحلقات';
+  const translateStatus = st => ({ Present:'حاضر', Absent:'غائب', Late:'متأخر', Excused:'بعذر', Holiday:'إجازة' }[st] || st);
+  const statusColor = st => ({ Present:'#16a34a', Absent:'#dc2626', Late:'#d97706', Excused:'#7c3aed', Holiday:'#0891b2' }[st] || '#374151');
+
+  const profileHTML = students.map(s => {
+    const cls      = state.classes.find(c => c.id === s.classId);
+    const history  = (s.history || []).slice(0, 30);
+    const leaves   = s.leaves || [];
+    const notices  = s.notices || [];
+    const exitCnt  = leaves.filter(l => l.type === 'Permission').length;
+    const present  = history.filter(h => h.status === 'Present').length;
+    const absent   = history.filter(h => h.status === 'Absent').length;
+    const late     = history.filter(h => h.status === 'Late').length;
+    const excused  = history.filter(h => h.status === 'Excused').length;
+    const rate     = history.length ? Math.round((present + excused) / history.length * 100) : '—';
+
+    const histRows = history.slice(0, 20).map(h => `
+      <tr>
+        <td>${formatHijri(h.date)}</td>
+        <td>${ARABIC_DAYS[new Date(h.date+'T00:00:00').getDay()] || ''}</td>
+        <td style="color:${statusColor(h.status)};font-weight:700">${translateStatus(h.status)}</td>
+        <td>${h.notes || ''}</td>
+      </tr>`).join('');
+
+    const noticeRows = notices.map(n => `
+      <tr>
+        <td style="font-weight:700;color:${n.type==='إنذار'?'#dc2626':'#1d4ed8'}">${n.type}</td>
+        <td>${formatHijri(n.date)}</td>
+        <td>${n.reason || '—'}</td>
+      </tr>`).join('');
+
+    return `
+    <div class="profile-page">
+      <div class="profile-header">
+        <div class="profile-header-top">
+          ${s.photo ? `<img src="${s.photo}" class="profile-photo" alt="${s.name}" />` : `<div class="profile-photo-placeholder">${s.name.charAt(0)}</div>`}
+          <div>
+            <div class="profile-school">${school}</div>
+            <div class="profile-name">${s.name}</div>
+            <div class="profile-meta">
+              ${cls ? `<span>الحلقة: ${cls.name}</span>` : ''}
+              ${s.studentId ? `<span>الرقم: ${s.studentId}</span>` : ''}
+              ${s.parentPhone ? `<span>ولي الأمر: ${s.parentPhone}</span>` : ''}
+              ${s.birthday ? `<span>تاريخ الميلاد: ${s.birthday}</span>` : ''}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-box green"><div class="stat-n">${present}</div><div class="stat-l">حاضر</div></div>
+        <div class="stat-box red"><div class="stat-n">${absent}</div><div class="stat-l">غائب</div></div>
+        <div class="stat-box amber"><div class="stat-n">${late}</div><div class="stat-l">متأخر</div></div>
+        <div class="stat-box blue"><div class="stat-n">${excused}</div><div class="stat-l">بعذر</div></div>
+        <div class="stat-box sky"><div class="stat-n">${exitCnt}</div><div class="stat-l">إذن خروج</div></div>
+        <div class="stat-box purple"><div class="stat-n">${rate}${rate!=='—'?'%':''}</div><div class="stat-l">نسبة</div></div>
+      </div>
+      ${history.length ? `
+      <div class="section-hdr">📅 سجل الحضور (آخر ${history.slice(0,20).length} يوم)</div>
+      <table><thead><tr><th>التاريخ</th><th>اليوم</th><th>الحالة</th><th>ملاحظات</th></tr></thead>
+      <tbody>${histRows}</tbody></table>` : ''}
+      ${notices.length ? `
+      <div class="section-hdr">📋 تعهدات وإنذارات</div>
+      <table><thead><tr><th>النوع</th><th>التاريخ</th><th>السبب</th></tr></thead>
+      <tbody>${noticeRows}</tbody></table>` : ''}
+      <div class="print-footer">تاريخ الطباعة: ${formatHijri(todayISO())} — ${school}</div>
+    </div>`;
+  }).join('');
+
+  const win = window.open('', '_blank', 'width=850,height=700');
+  win.document.write(`<!DOCTYPE html><html dir="rtl"><head>
+  <meta charset="UTF-8"><title>ملفات الطلاب</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+    body{background:#fff;color:#111}
+    .profile-page{padding:20px 24px;page-break-after:always;max-width:800px;margin:auto}
+    .profile-page:last-child{page-break-after:auto}
+    .profile-header{border-bottom:3px solid #1D4ED8;padding-bottom:12px;margin-bottom:14px}
+    .profile-header-top{display:flex;align-items:center;gap:16px}
+    .profile-photo{width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid #1D4ED8;flex-shrink:0}
+    .profile-photo-placeholder{width:72px;height:72px;border-radius:50%;background:#DBEAFE;color:#1D4ED8;font-size:28px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:3px solid #1D4ED8}
+    .profile-school{font-size:12px;color:#64748B;font-weight:600;margin-bottom:4px}
+    .profile-name{font-size:22px;font-weight:800;color:#1D4ED8;margin-bottom:6px}
+    .profile-meta{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#374151}
+    .stats-row{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+    .stat-box{flex:1;min-width:60px;text-align:center;border-radius:8px;padding:8px 4px}
+    .green{background:#f0fdf4}.red{background:#fef2f2}.amber{background:#fffbeb}
+    .blue{background:#eff6ff}.sky{background:#f0f9ff}.purple{background:#faf5ff}
+    .stat-n{font-size:20px;font-weight:800}
+    .stat-l{font-size:10px;color:#64748B;margin-top:2px}
+    .section-hdr{font-size:13px;font-weight:700;color:#1D4ED8;margin:14px 0 6px;border-right:3px solid #1D4ED8;padding-right:8px}
+    table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:10px}
+    th{background:#1D4ED8;color:white;padding:6px 8px;text-align:right}
+    td{padding:5px 8px;border-bottom:1px solid #e2e8f0;text-align:right}
+    tr:nth-child(even) td{background:#f8fafc}
+    .print-footer{font-size:10px;color:#94a3b8;text-align:center;margin-top:16px;border-top:1px solid #e2e8f0;padding-top:8px}
+    @page{size:A4 portrait;margin:15mm}
+  </style></head><body>${profileHTML}</body></html>`);
+  win.document.close();
+  setTimeout(() => win.print(), 700);
+}
+
+// ════════════════════════════════════════════════════════
+//  Update bulk count to enable/disable print button too
+// ════════════════════════════════════════════════════════
+const _origBulkUpdateCount = _studentBulkUpdateCount;
+// Override to also toggle print btn
+function _studentBulkUpdateCount() {
+  const n = _studentBulkSelected.size;
+  const countEl = document.getElementById('studentBulkCount');
+  const delBtn  = document.getElementById('studentBulkDeleteBtn');
+  const prtBtn  = document.getElementById('studentBulkPrintBtn');
+  if (countEl) countEl.textContent = `${n} محدد`;
+  if (delBtn)  delBtn.disabled = n === 0;
+  if (prtBtn)  prtBtn.disabled = n === 0;
 }

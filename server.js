@@ -39,6 +39,7 @@ const DEFAULT_DB = {
   students: [], classes: [], teachers: [],
   teacherLog: [], attendance: [], leaves: [], holidays: [], quranProgress: [],
   calendarEvents: [], // [{id, date, endDate?, title, type, note, color, sendWa, waMessage, waTargets}]
+  notices: [],       // [{id, studentId, type:'تعهد'|'إنذار', date, reason, createdAt}]
   waGroups:    [],   // [{id, name, members:[{name,phone}]}]
   waLog:       [],   // [{id, date, type, studentId, studentName, phone, className, message, status, sentAt, error}]
   waDismissed: [],   // [{studentId, date}] — separate from waLog so log-clear never touches it
@@ -258,7 +259,11 @@ async function buildDailySheet(db, date, classId) {
     const sc2=ws.getCell(dr,5);
     sc2.value=STATUS_AR[st]||st; sc2.fill=xFill(STATUS_BG[st]||C.rowA);
     sc2.font=xFont({sz:10,bold:true,color:STATUS_FG[st]||'000000'}); sc2.alignment=xAlign('center'); sc2.border=xBorder();
-    dataCell(ws.getCell(dr,6), a.notes||'', even,'right');
+    const exitToday = (db.leaves||[]).find(l=>l.studentId===a.studentId&&l.date===date&&l.type==='Permission');
+    const notesTxt = exitToday
+      ? `📋 إذن خروج${exitToday.reason?': '+exitToday.reason:''}${a.notes?' | '+a.notes:''}`
+      : (a.notes||'');
+    dataCell(ws.getCell(dr,6), notesTxt, even,'right');
     dr++;
   });
   ws.getRow(dr).height=6; for(let c=1;c<=cols;c++) ws.getCell(dr,c).fill=xFill(C.headBg); dr++;
@@ -285,7 +290,7 @@ async function buildMonthlySheet(db, year, month, classId) {
   const summaryStart = 4+totalDayCols;
   const totalCols    = summaryStart+3;
 
-  ws.columns = [{width:5},{width:26},{width:18},...Array(totalDayCols).fill({width:6}),{width:8},{width:8},{width:8},{width:8}];
+  ws.columns = [{width:5},{width:26},{width:18},...Array(totalDayCols).fill({width:6}),{width:8},{width:8},{width:8},{width:8},{width:8}];
 
   const logoEnd = await addLogoImage(wb, ws, totalCols, db);
   const r1=logoEnd+1; titleRow(ws,r1,school,C.navy,{sz:14,bold:true,color:C.white},totalCols,36);
@@ -306,6 +311,7 @@ async function buildMonthlySheet(db, year, month, classId) {
   sc(ws.getCell(r3,summaryStart+1),'الغياب\nإجمالي', C.redBg,  {sz:9,bold:true,color:C.redFg},  'center',true);
   sc(ws.getCell(r3,summaryStart+2),'التأخير\nإجمالي',C.amberBg,{sz:9,bold:true,color:C.amberFg},'center',true);
   sc(ws.getCell(r3,summaryStart+3),'الاعذار\nإجمالي', C.blueBg, {sz:9,bold:true,color:C.blueFg}, 'center',true);
+  sc(ws.getCell(r3,summaryStart+4),'إذن خروج', C.slate,{sz:9,bold:true,color:C.headFg},'center',true);
 
   let dr=r3+1;
   studs.forEach((s,si)=>{
@@ -341,10 +347,12 @@ async function buildMonthlySheet(db, year, month, classId) {
       else if (st==='Excused') excused++;
     });
 
+    const exitCnt = (db.leaves||[]).filter(l=>l.studentId===s.id&&l.type==='Permission'&&inHijriMonth(l.date,+year,+month)).length;
     dataCell(ws.getCell(dr,summaryStart),  present, even,'center',true,C.greenBg);
     dataCell(ws.getCell(dr,summaryStart+1),absent,  even,'center',true,C.redBg);
     dataCell(ws.getCell(dr,summaryStart+2),late,    even,'center',true,C.amberBg);
     dataCell(ws.getCell(dr,summaryStart+3),excused, even,'center',true,C.blueBg);
+    dataCell(ws.getCell(dr,summaryStart+4),exitCnt, even,'center',true,C.slate);
     dr++;
   });
   return wb;
@@ -609,7 +617,9 @@ app.get('/api/students/:id', (req, res) => {
   const s  = db.students.find(x => x.id===req.params.id);
   if (!s) return res.json({ success:false });
   const history = db.attendance.filter(a=>a.studentId===s.id).sort((a,b)=>b.date.localeCompare(a.date));
-  res.json({ ...s, history });
+  const leaves  = db.leaves.filter(l=>l.studentId===s.id).sort((a,b)=>b.date.localeCompare(a.date));
+  const notices = (db.notices||[]).filter(n=>n.studentId===s.id).sort((a,b)=>b.date.localeCompare(a.date));
+  res.json({ ...s, history, leaves, notices });
 });
 
 app.post('/api/students/:id/photo', upload.single('photo'), (req, res) => {
@@ -823,11 +833,12 @@ app.post('/api/leaves', (req, res) => {
   const id = newId();
   const { studentId, classId, date, type } = req.body;
   saveDB(db => {
-    // Upsert leave record
-    db.leaves = db.leaves.filter(l => !(l.studentId === studentId && l.date === date));
+    // Upsert: one record per student per date per type (no duplicates)
+    db.leaves = db.leaves.filter(l => !(l.studentId === studentId && l.date === date && l.type === type));
     db.leaves.push({ ...req.body, id });
-    // Auto-correct: if student already has Absent attendance today, upgrade to Excused
-    if (studentId && date) {
+    // Auto-correct attendance: Absent → Excused ONLY for non-Permission types
+    // إذن خروج is given to a student who ATTENDED and left early — do NOT change status
+    if (studentId && date && type !== 'Permission') {
       const i = db.attendance.findIndex(a => a.studentId === studentId && a.date === date && a.status === 'Absent');
       if (i >= 0) {
         db.attendance[i] = { ...db.attendance[i], status: 'Excused', notes: type || 'إذن' };
@@ -839,6 +850,31 @@ app.post('/api/leaves', (req, res) => {
 
 app.delete('/api/leaves/:id', (req, res) => {
   saveDB(db=>{ db.leaves=db.leaves.filter(l=>l.id!==req.params.id); }); res.json({ok:true});
+});
+
+// ════════════════════════════════════════════════════════
+//  تعهدات وإنذارات
+// ════════════════════════════════════════════════════════
+app.get('/api/notices', (req, res) => {
+  const { studentId } = req.query;
+  let r = readDB().notices || [];
+  if (studentId) r = r.filter(n => n.studentId === studentId);
+  res.json(r);
+});
+
+app.post('/api/notices', (req, res) => {
+  const id = newId();
+  const createdAt = new Date().toISOString();
+  saveDB(db => {
+    if (!db.notices) db.notices = [];
+    db.notices.push({ ...req.body, id, createdAt });
+  });
+  res.json({ ok: true, id });
+});
+
+app.delete('/api/notices/:id', (req, res) => {
+  saveDB(db => { db.notices = (db.notices||[]).filter(n => n.id !== req.params.id); });
+  res.json({ ok: true });
 });
 
 
@@ -995,10 +1031,17 @@ async function scheduleEventOnFonnte(token, ev, schoolName) {
   if (!token || !ev.waTargets?.length || !ev.waMessage) return [];
 
   // Build schedule timestamp from user-set time in Saudi timezone (UTC+3)
-  const timeStr = (ev.time && /^\d{1,2}:\d{2}$/.test(ev.time)) ? ev.time : '12:00';
+  const timeStr = (ev.time && /^\d{1,2}:\d{2}$/.test(ev.time)) ? ev.time : '09:00';
   const scheduledMoment = new Date(`${ev.date}T${timeStr}:00+03:00`).getTime();
   const nowMs           = Date.now();
-  // If already past or <2 min away, schedule 2 min from now
+
+  // If event date+time is already past, skip — do NOT send immediately
+  if (scheduledMoment < nowMs - 60000) {
+    console.warn(`[fonnte-schedule] SKIPPED "${ev.title}" — date ${ev.date} ${timeStr} is in the past`);
+    return [];
+  }
+
+  // If <2 min away, schedule 2 min from now
   const sendAt     = scheduledMoment > nowMs + 120000 ? scheduledMoment : nowMs + 120000;
   const scheduleTs = Math.floor(sendAt / 1000);
 
@@ -1698,6 +1741,96 @@ app.get('/api/reports/teacher-monthly/hijri/:year/:month', async (req, res) => {
 });
 
 // Excel — تقرير تقدم القرآن لطالب
+// Excel — تقرير حضور + إذن خروج لطالب
+app.get('/api/reports/attendance/student/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const db = readDB();
+    const s  = db.students.find(x => x.id === studentId);
+    if (!s) return res.status(404).json({ error: 'الطالب غير موجود' });
+    const cls     = db.classes.find(c => c.id === s.classId);
+    const history = db.attendance.filter(a => a.studentId === studentId).sort((a,b) => b.date.localeCompare(a.date));
+    const leaves  = db.leaves.filter(l => l.studentId === studentId);
+    const exitPerms = leaves.filter(l => l.type === 'Permission');
+    const school  = db.settings.schoolName || 'حضور الحلقات';
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('سجل الطالب', { views: [{ rightToLeft: true }] });
+    ws.columns = [{ width: 6 }, { width: 22 }, { width: 14 }, { width: 16 }, { width: 28 }];
+
+    const logoEnd = await addLogoImage(wb, ws, 5, db);
+    let r = logoEnd + 1;
+
+    titleRow(ws, r,   school, C.navy,  { sz: 13, bold: true, color: C.white }, 5, 34); r++;
+    titleRow(ws, r,   `سجل حضور: ${s.name}${cls ? ' — ' + cls.name : ''}`, C.slate, { sz: 11, bold: true, color: C.white }, 5, 28); r++;
+
+    // Stats summary
+    const total     = history.length;
+    const present   = history.filter(h => h.status === 'Present').length;
+    const absent    = history.filter(h => h.status === 'Absent').length;
+    const late      = history.filter(h => h.status === 'Late').length;
+    const excused   = history.filter(h => h.status === 'Excused').length;
+    const exitCount = exitPerms.length;
+
+    ws.getRow(r).height = 24;
+    ws.mergeCells(r, 1, r, 5);
+    const summaryText = `حاضر: ${present}  |  غائب: ${absent}  |  متأخر: ${late}  |  بعذر: ${excused}  |  إذن خروج: ${exitCount}  |  نسبة: ${total ? Math.round((present+excused)/total*100) : 0}%`;
+    sc(ws.getCell(r, 1), summaryText, C.totalBg, { sz: 10, bold: true, color: C.headFg }, 'center'); r++;
+
+    // Header row
+    ws.getRow(r).height = 26;
+    ['م', 'التاريخ الهجري', 'اليوم', 'الحالة', 'ملاحظات'].forEach((h, i) =>
+      sc(ws.getCell(r, i + 1), h, C.headBg, { sz: 10, bold: true, color: C.headFg }, 'center', true));
+    r++;
+
+    history.forEach((a, idx) => {
+      const even = r % 2 === 0;
+      ws.getRow(r).height = 22;
+      dataCell(ws.getCell(r, 1), idx + 1, even, 'center');
+      dataCell(ws.getCell(r, 2), formatHijri(a.date), even, 'right');
+      dataCell(ws.getCell(r, 3), dayNameAr(a.date), even, 'center');
+      const sc2 = ws.getCell(r, 4);
+      sc2.value = STATUS_AR[a.status] || a.status;
+      sc2.fill  = xFill(STATUS_BG[a.status] || C.rowA);
+      sc2.font  = xFont({ sz: 10, bold: true, color: STATUS_FG[a.status] || '000000' });
+      sc2.alignment = xAlign('center'); sc2.border = xBorder();
+      // Annotate if exit permission was given on same date
+      const exitOnDay = exitPerms.find(l => l.date === a.date);
+      const notesText = exitOnDay
+        ? `📋 إذن خروج${exitOnDay.reason ? ': ' + exitOnDay.reason : ''}${a.notes ? ' | ' + a.notes : ''}`
+        : (a.notes || '');
+      dataCell(ws.getCell(r, 5), notesText, even, 'right');
+      r++;
+    });
+
+    // Exit permits section
+    if (exitPerms.length) {
+      r++; ws.getRow(r).height = 6; r++;
+      ws.mergeCells(r, 1, r, 5);
+      titleRow(ws, r, `إذن خروج (${exitPerms.length})`, C.navy, { sz: 11, bold: true, color: C.white }, 5, 28); r++;
+      ws.getRow(r).height = 26;
+      ['م', 'التاريخ الهجري', 'اليوم', 'وقت الإذن', 'ملاحظات'].forEach((h, i) =>
+        sc(ws.getCell(r, i + 1), h, C.headBg, { sz: 10, bold: true, color: C.headFg }, 'center', true));
+      r++;
+      exitPerms.forEach((l, idx) => {
+        const even = r % 2 === 0;
+        ws.getRow(r).height = 22;
+        dataCell(ws.getCell(r, 1), idx + 1, even, 'center');
+        dataCell(ws.getCell(r, 2), formatHijri(l.date), even, 'right');
+        dataCell(ws.getCell(r, 3), dayNameAr(l.date), even, 'center');
+        dataCell(ws.getCell(r, 4), l.time || '—', even, 'center');
+        dataCell(ws.getCell(r, 5), l.reason || '—', even, 'right');
+        r++;
+      });
+    }
+
+    const name = `سجل-حضور-${s.name}`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', arabicFilename(name));
+    await wb.xlsx.write(res);
+  } catch(e) { console.error(e); res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/reports/quran/student/:studentId', async (req, res) => {
   try {
     const { studentId } = req.params;
@@ -2149,19 +2282,55 @@ app.post('/api/calendar', async (req, res) => {
   res.json({ ok: true, ids, scheduleResults });
 });
 
-app.put('/api/calendar/:id', (req, res) => {
+app.put('/api/calendar/:id', async (req, res) => {
+  const db0   = readDB();
+  const token = db0.settings?.whatsappApiKey;
+  const old   = (db0.calendarEvents || []).find(e => e.id === req.params.id);
+
+  // Cancel previously scheduled Fonnte messages for this event if any
+  if (token && old?.fonnteScheduled?.length) {
+    for (const entry of old.fonnteScheduled) {
+      try { await fonnteDeleteMessage(token, entry.fonnteId); } catch(e) { /* ignore */ }
+    }
+  }
+
+  let updatedEv;
   saveDB(db => {
     if (!db.calendarEvents) db.calendarEvents = [];
     const idx = db.calendarEvents.findIndex(e => e.id === req.params.id);
-    if (idx >= 0) db.calendarEvents[idx] = { ...db.calendarEvents[idx], ...req.body };
+    if (idx >= 0) {
+      db.calendarEvents[idx] = { ...db.calendarEvents[idx], ...req.body, fonnteScheduled: [] };
+      updatedEv = db.calendarEvents[idx];
+    }
     // Sync holidays if type changed
-    const ev = db.calendarEvents[idx];
-    if (ev && (ev.type === 'holiday' || ev.type === 'offday')) {
+    if (updatedEv && (updatedEv.type === 'holiday' || updatedEv.type === 'offday')) {
       db.holidays = db.holidays.filter(h => !h.id.startsWith(req.params.id + '_h'));
-      db.holidays.push({ id: ev.id + '_h', date: ev.date, type: ev.type === 'holiday' ? 'Holiday' : 'OffDay', reason: ev.title });
+      db.holidays.push({ id: updatedEv.id + '_h', date: updatedEv.date, type: updatedEv.type === 'holiday' ? 'Holiday' : 'OffDay', reason: updatedEv.title });
     }
   });
-  res.json({ ok: true });
+
+  // Reschedule on Fonnte if this is a message event with targets
+  let scheduleResult = null;
+  if (token && updatedEv?.type === 'message' && updatedEv?.waTargets?.length && updatedEv?.waMessage) {
+    try {
+      const db2 = readDB();
+      const schoolName = db2.settings?.schoolName || '';
+      const scheduled = await scheduleEventOnFonnte(token, updatedEv, schoolName);
+      if (scheduled.length) {
+        saveDB(db3 => {
+          const ev = (db3.calendarEvents || []).find(e => e.id === req.params.id);
+          if (ev) ev.fonnteScheduled = scheduled;
+        });
+        scheduleResult = { ok: true, count: scheduled.length };
+      } else {
+        scheduleResult = { ok: false, error: 'Fonnte did not return IDs' };
+      }
+    } catch(e) {
+      scheduleResult = { ok: false, error: e.message };
+    }
+  }
+
+  res.json({ ok: true, scheduleResult });
 });
 
 app.delete('/api/calendar/:id', async (req, res) => {
@@ -2233,6 +2402,49 @@ app.get('*', (_, res) => {
 // ════════════════════════════════════════════════════════
 //  تشغيل الخادم
 // ════════════════════════════════════════════════════════
+// ── Local fallback scheduler: checks every 60s for due message events ──
+// Catches events whose Fonnte scheduling failed or had no token at save time.
+const _localSchedulerSent = new Set(); // prevent double-sending in same process
+setInterval(async () => {
+  try {
+    const db    = readDB();
+    const token = db.settings?.whatsappApiKey;
+    if (!token) return;
+    const nowMs = Date.now();
+    const events = (db.calendarEvents || []).filter(ev => {
+      if (ev.type !== 'message') return false;
+      if (!ev.waTargets?.length || !ev.waMessage) return false;
+      if (_localSchedulerSent.has(ev.id)) return false;
+      // Already successfully scheduled on Fonnte — skip
+      if (ev.fonnteScheduled?.length) return false;
+      const timeStr = (ev.time && /^\d{1,2}:\d{2}$/.test(ev.time)) ? ev.time : '09:00';
+      const sendAt  = new Date(`${ev.date}T${timeStr}:00+03:00`).getTime();
+      // Due = within last 5 min or up to 1 min in future (local delivery window)
+      return sendAt <= nowMs + 60000 && sendAt >= nowMs - 300000;
+    });
+    for (const ev of events) {
+      _localSchedulerSent.add(ev.id); // mark immediately to prevent retry loop
+      console.log(`[local-scheduler] delivering "${ev.title}" on ${ev.date} NOW (Fonnte scheduling was skipped)`);
+      try {
+        const schoolName = db.settings?.schoolName || '';
+        const scheduled  = await scheduleEventOnFonnte(token, ev, schoolName);
+        if (scheduled.length) {
+          saveDB(db2 => {
+            const stored = (db2.calendarEvents || []).find(e => e.id === ev.id);
+            if (stored) stored.fonnteScheduled = scheduled;
+          });
+          console.log(`[local-scheduler] ✅ sent ${scheduled.length} messages for "${ev.title}"`);
+        }
+      } catch(e) {
+        console.error(`[local-scheduler] error for "${ev.title}":`, e.message);
+        _localSchedulerSent.delete(ev.id); // allow retry next tick
+      }
+    }
+  } catch(e) {
+    console.error('[local-scheduler] tick error:', e.message);
+  }
+}, 60 * 1000); // every 60 seconds
+
 app.listen(PORT, '0.0.0.0', () => {
   const ip = getLocalIP();
   console.log(`\n╔══════════════════════════════════════════╗`);

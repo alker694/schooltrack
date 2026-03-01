@@ -366,80 +366,22 @@
       "id": "mm4e6wvu8gex"
     }
   ],
-  "teacherLog": [
-    {
-      "id": "mm5ke7lo5wb9",
-      "teacherId": "mm22vi48bzlh",
-      "date": "2026-02-28",
-      "checkIn": "03:10",
-      "checkOut": "04:18"
-    },
-    {
-      "id": "mm5ke87n02j0",
-      "teacherId": "mm27tb1xzlwq",
-      "date": "2026-02-28",
-      "checkIn": "03:10",
-      "checkOut": "04:18"
-    },
-    {
-      "id": "mm5ke8k8pthh",
-      "teacherId": "mm27xamahc4u",
-      "date": "2026-02-28",
-      "checkIn": "03:10",
-      "checkOut": "04:18"
-    },
-    {
-      "id": "mm5ke8yt4qju",
-      "teacherId": "mm27xvihkz3k",
-      "date": "2026-02-28",
-      "checkIn": "03:10",
-      "checkOut": "04:18"
-    },
-    {
-      "id": "mm5kea74n2e1",
-      "teacherId": "mm27y8pmxcjl",
-      "date": "2026-02-28",
-      "checkIn": "03:10",
-      "checkOut": "04:18"
-    },
-    {
-      "id": "mm5keb1orzzz",
-      "teacherId": "mm27yl0arnx5",
-      "date": "2026-02-28",
-      "checkIn": "03:10",
-      "checkOut": "04:18"
-    },
-    {
-      "id": "mm5kebjtrgyc",
-      "teacherId": "mm4e6wvu8gex",
-      "date": "2026-02-28",
-      "checkIn": "03:10",
-      "checkOut": "04:18"
-    }
-  ],
+  "teacherLog": [],
   "attendance": [
     {
-      "id": "mm5oe445kem5",
-      "date": "2026-02-28",
+      "id": "mm7v87p8pbn8",
+      "date": "2026-03-01",
       "classId": "mm27ot84jw17",
       "studentId": "mm3kqua22j0h",
       "status": "Absent",
       "notes": ""
     },
     {
-      "id": "mm5ozxr2rxpz",
-      "date": "2026-02-28",
-      "classId": "mm27mlol8n1i",
-      "studentId": "mm53dstfazer",
-      "status": "Absent",
-      "notes": ""
-    },
-    {
-      "id": "mm5ptqf198wr",
-      "date": "2026-02-28",
+      "id": "mm7v87p8ky31",
+      "date": "2026-03-01",
       "classId": "mm27ot84jw17",
       "studentId": "mm5ptfr39koe",
-      "status": "Absent",
+      "status": "Present",
       "notes": ""
     }
   ],
@@ -465,46 +407,29 @@
         "url": "/uploads/mm1fbpsrfvb4_IMG-20260225-WA0001-removebg-preview-1.png",
         "name": "IMG 20260225 WA0001 removebg preview 1"
       }
-    ]
-  },
-  "quranProgress": [
-    {
-      "studentId": "mm16ips1c266",
-      "classId": "mm15rui7hnmc",
-      "date": "2026-02-25",
-      "type": "memorization",
-      "surahFromNum": 1,
-      "surahFromName": "الفاتحة",
-      "surahToNum": 1,
-      "surahToName": "الفاتحة",
-      "ayahFrom": 2,
-      "ayahTo": 2,
-      "juz": null,
-      "pageFrom": null,
-      "pageTo": null,
-      "grade": "ممتاز",
-      "notes": "",
-      "id": "mm1ihpziy6n7"
-    },
-    {
-      "studentId": "mm22tveznw9r",
-      "classId": "mm22tgmckavj",
-      "date": "2026-02-25",
-      "type": "memorization",
-      "surahFromNum": 1,
-      "surahFromName": "الفاتحة",
-      "surahToNum": 7,
-      "surahToName": "الأعراف",
-      "ayahFrom": 1,
-      "ayahTo": 5,
-      "juz": null,
-      "pageFrom": null,
-      "pageTo": null,
-      "grade": "ممتاز",
-      "notes": "",
-      "id": "mm232bat1pp0"
+    ],
+    "dateFormat": {
+      "tokens": [
+        {
+          "key": "day",
+          "label": "اليوم",
+          "on": true
+        },
+        {
+          "key": "month",
+          "label": "الشهر",
+          "on": true
+        },
+        {
+          "key": "year",
+          "label": "السنة",
+          "on": true
+        }
+      ],
+      "sep": " - "
     }
-  ],
+  },
+  "quranProgress": [],
   "waGroups": [
     {
       "id": "mm3jmdsns00i",
@@ -580,486 +505,73 @@
   ],
   "waLog": [
     {
-      "id": "mm5leq5eloi3",
-      "type": "scheduled",
-      "eventId": "mm5lepjiauhi",
-      "date": "2026-02-28",
-      "studentName": "0563997080",
-      "phone": "0563997080",
-      "className": "ffgfh",
-      "message": "trwjhn4jktymj",
-      "status": "failed",
-      "fonnteIds": [],
-      "sentAt": "2026-02-28T00:38:31.394Z",
-      "scheduledFor": "2026-02-28T00:40:30.607Z",
-      "error": "getaddrinfo ENOTFOUND api.fonnte.com | raw: "
-    },
-    {
-      "id": "mm5leq5f7iri",
-      "type": "scheduled",
-      "eventId": "mm5leosgqwhe",
-      "date": "2026-02-28",
-      "studentName": "0563997080",
-      "phone": "0563997080",
-      "className": "ffgfh",
-      "message": "trwjhn4jktymj",
-      "status": "failed",
-      "fonnteIds": [],
-      "sentAt": "2026-02-28T00:38:31.395Z",
-      "scheduledFor": "2026-02-28T00:40:29.633Z",
-      "error": "getaddrinfo ENOTFOUND api.fonnte.com | raw: "
-    },
-    {
-      "id": "mm5lmst6688e",
-      "type": "scheduled",
-      "eventId": "mm5lmroz8l64",
-      "date": "2026-02-28",
-      "studentName": "0563997080",
-      "phone": "0563997080",
-      "className": "rgergerh",
-      "message": "hrthbgtrfvedvfgw4efgv",
-      "status": "failed",
-      "fonnteIds": [],
-      "sentAt": "2026-02-28T00:44:48.090Z",
-      "scheduledFor": "2026-02-28T00:47:00.000Z",
-      "error": "getaddrinfo ENOTFOUND api.fonnte.com"
-    },
-    {
-      "id": "mm5lpusrw715",
-      "type": "scheduled",
-      "eventId": "mm5lpsf20twx",
-      "date": "2026-02-28",
-      "studentName": "fgbrtsntrrhnr",
-      "phone": "0563997080",
-      "className": "rfgergr",
-      "message": "efefvegrgvr",
-      "status": "scheduled",
-      "fonnteIds": [
-        145608278
-      ],
-      "sentAt": "2026-02-28T00:47:10.635Z",
-      "scheduledFor": "2026-02-28T01:09:00.000Z",
-      "error": ""
-    },
-    {
-      "id": "mm5lsu19z06e",
-      "type": "scheduled",
-      "eventId": "mm5lssf4jkyl",
-      "date": "2026-02-28",
-      "studentName": "0563997080",
-      "phone": "0563997080",
-      "className": "rgrdvsedfc",
-      "message": "ewggvs",
-      "status": "scheduled",
-      "fonnteIds": [
-        145608488
-      ],
-      "sentAt": "2026-02-28T00:49:29.613Z",
-      "scheduledFor": "2026-02-28T00:52:00.000Z",
-      "error": ""
-    },
-    {
-      "id": "mm5mjia2sz50",
-      "type": "group-chat",
-      "date": "2026-02-28",
-      "studentName": "مجموعة: 120363405254145404@g.us",
-      "phone": "120363405254145404@g.us",
-      "message": "egredgerfg",
-      "status": "failed",
-      "sentAt": "2026-02-28T01:10:14.091Z",
-      "error": "getaddrinfo ENOTFOUND api.fonnte.com"
-    },
-    {
-      "id": "mm5mk0ipifma",
-      "type": "group-chat",
-      "date": "2026-02-28",
-      "studentName": "مجموعة: 120363405254145404@g.us",
-      "phone": "120363405254145404@g.us",
-      "message": "egredgerfgw",
-      "status": "failed",
-      "sentAt": "2026-02-28T01:10:37.729Z",
-      "error": "getaddrinfo ENOTFOUND api.fonnte.com"
-    },
-    {
-      "id": "mm5mknat541d",
-      "type": "group-chat",
-      "date": "2026-02-28",
-      "studentName": "مجموعة: 120363405254145404@g.us",
-      "phone": "120363405254145404@g.us",
-      "message": "egredgerfgw",
-      "status": "failed",
-      "sentAt": "2026-02-28T01:11:07.253Z",
-      "error": "target input invalid"
-    },
-    {
-      "id": "mm5mkqogxnnl",
-      "type": "group-chat",
-      "date": "2026-02-28",
-      "studentName": "مجموعة: 120363405254145404@g.us",
-      "phone": "120363405254145404@g.us",
-      "message": "egredgerfgw",
-      "status": "failed",
-      "sentAt": "2026-02-28T01:11:11.632Z",
-      "error": "target input invalid"
-    },
-    {
-      "id": "mm5mla48ip4o",
-      "type": "group-chat",
-      "date": "2026-02-28",
-      "studentName": "مجموعة: 120363405254145404@g.us",
-      "phone": "120363405254145404@g.us",
-      "message": "egredgerfgw",
-      "status": "failed",
-      "sentAt": "2026-02-28T01:11:36.824Z",
-      "error": "target input invalid"
-    },
-    {
-      "id": "mm5mnrxiwe24",
-      "type": "group-chat",
-      "date": "2026-02-28",
-      "studentName": "مجموعة: 120363405254145404@g.us",
-      "phone": "120363405254145404@g.us",
-      "message": "egredgerfgw",
-      "status": "failed",
-      "sentAt": "2026-02-28T01:13:33.222Z",
-      "error": "target input invalid"
-    },
-    {
-      "id": "mm5mpbcf3o2x",
-      "type": "custom",
-      "date": "2026-02-28",
-      "studentName": "0563997080",
-      "phone": "0563997080",
-      "message": "rgrhg5rh",
-      "status": "sent",
-      "sentAt": "2026-02-28T01:14:45.039Z",
-      "error": ""
-    },
-    {
-      "id": "mm5mqrw2vbnj",
-      "type": "scheduled",
-      "eventId": "mm5mqqgqq28a",
-      "date": "2026-02-28",
-      "studentName": "مجموعة واتساب",
-      "phone": "120363405254145404@g.us",
-      "className": "fvdvrdv",
-      "message": "ef4grg5rgv5r",
-      "status": "failed",
-      "fonnteIds": [],
-      "sentAt": "2026-02-28T01:15:53.138Z",
-      "scheduledFor": "2026-02-28T13:19:00.000Z",
-      "error": "target input invalid"
-    },
-    {
-      "id": "mm5mtditjqis",
-      "type": "group-chat",
-      "date": "2026-02-28",
-      "studentName": "مجموعة: 120363405254145404@g.us",
-      "phone": "120363405254145404@g.us",
-      "message": "egredgerfgweg4rehbrbedfv",
-      "status": "sent",
-      "sentAt": "2026-02-28T01:17:54.485Z",
-      "error": ""
-    },
-    {
-      "id": "mm5n6nrdj6qm",
-      "type": "scheduled",
-      "eventId": "mm5n6m8wreir",
-      "date": "2026-02-28",
-      "studentName": "مجموعة واتساب",
-      "phone": "120363405254145404@g.us",
-      "className": "edfedfe",
-      "message": "regrehrethger",
-      "status": "scheduled",
-      "fonnteIds": [
-        145614102
-      ],
-      "sentAt": "2026-02-28T01:28:14.281Z",
-      "scheduledFor": "2026-02-28T02:03:00.000Z",
-      "error": ""
-    },
-    {
-      "id": "mm5nadalmhus",
-      "type": "scheduled",
-      "eventId": "mm5nabvslojh",
-      "date": "2026-02-28",
-      "studentName": "مجموعة واتساب",
-      "phone": "120363405254145404@g.us",
-      "className": "edvesdcf",
-      "message": "4g3erwdfvsf4ed",
-      "status": "scheduled",
-      "fonnteIds": [
-        145614415
-      ],
-      "sentAt": "2026-02-28T01:31:07.341Z",
-      "scheduledFor": "2026-02-28T02:05:00.000Z",
-      "error": ""
-    },
-    {
-      "id": "mm5ndac7zagr",
-      "type": "scheduled",
-      "eventId": "mm5nd8sfysuw",
-      "date": "2026-02-28",
-      "studentName": "مجموعة واتساب",
-      "phone": "120363405254145404@g.us",
-      "className": "efwtge",
-      "message": "rfdwef",
-      "status": "scheduled",
-      "fonnteIds": [
-        145614632
-      ],
-      "sentAt": "2026-02-28T01:33:23.479Z",
-      "scheduledFor": "2026-02-28T02:05:00.000Z",
-      "error": ""
-    },
-    {
-      "id": "mm5ndb38hjvr",
-      "type": "scheduled",
-      "eventId": "mm5ndas1llun",
-      "date": "2026-02-28",
-      "studentName": "مجموعة واتساب",
-      "phone": "120363405254145404@g.us",
-      "className": "efwtge",
-      "message": "rfdwef",
-      "status": "scheduled",
-      "fonnteIds": [
-        145614634
-      ],
-      "sentAt": "2026-02-28T01:33:24.452Z",
-      "scheduledFor": "2026-02-28T02:05:00.000Z",
-      "error": ""
-    },
-    {
-      "id": "mm5nh4kx7dvi",
-      "type": "scheduled",
-      "eventId": "mm5nh30tqmse",
-      "date": "2026-02-28",
-      "studentName": "مجموعة واتساب",
-      "phone": "120363405254145404@g.us",
-      "className": "egvfwvg",
-      "message": "erfewqfdd",
-      "status": "scheduled",
-      "fonnteIds": [
-        145614921
-      ],
-      "sentAt": "2026-02-28T01:36:22.641Z",
-      "scheduledFor": "2026-02-28T02:55:00.000Z",
-      "error": ""
-    },
-    {
-      "id": "mm5nkc948ffu",
-      "type": "scheduled",
-      "eventId": "mm5nkaa2bbim",
-      "date": "2026-02-28",
-      "studentName": "مجموعة واتساب",
-      "phone": "120363405254145404@g.us",
-      "className": "wsdefw",
-      "message": "efewffweef",
-      "status": "scheduled",
-      "fonnteIds": [
-        145615251
-      ],
-      "sentAt": "2026-02-28T01:38:52.552Z",
-      "scheduledFor": "2026-02-28T02:55:00.000Z",
-      "error": ""
-    },
-    {
-      "id": "mm5nmo7oidk7",
-      "type": "scheduled",
-      "eventId": "mm5nmmjwoqcf",
-      "date": "2026-02-28",
-      "studentName": "مجموعة واتساب",
-      "phone": "120363405254145404@g.us",
-      "className": "gvewdc",
-      "message": "efwfwces",
-      "status": "scheduled",
-      "fonnteIds": [
-        145615474
-      ],
-      "sentAt": "2026-02-28T01:40:41.364Z",
-      "scheduledFor": "2026-02-28T02:55:00.000Z",
-      "error": ""
-    },
-    {
-      "id": "mm5nnl0zz142",
-      "type": "scheduled",
-      "eventId": "mm5nnjlj0rmi",
-      "date": "2026-02-28",
-      "studentName": "مجموعة واتساب",
-      "phone": "120363405254145404@g.us",
-      "className": "wefewsdfcwe",
-      "message": "ewfewfce",
-      "status": "scheduled",
-      "fonnteIds": [
-        145615558
-      ],
-      "sentAt": "2026-02-28T01:41:23.891Z",
-      "scheduledFor": "2026-02-28T03:06:00.000Z",
-      "error": ""
-    },
-    {
-      "id": "mm5oe9cd13y5",
+      "id": "mm7v8b2t1fwy",
       "type": "absence",
-      "date": "2026-02-28",
+      "date": "2026-03-01",
       "studentId": "mm3kqua22j0h",
       "studentName": "amro",
       "phone": "0563997080",
       "className": "حلقة الشيخ آل فريان",
       "classId": "mm27ot84jw17",
-      "message": "السلام عليكم ورحمة الله وبركاته\n🚨🚨🚨🚨🚨\nالمكرم ولي أمر الطالب: amro\nنحيطكم علما بأن ابنكم قد تغيب اليوم السبت الموافق 11 رمضان 1447هـ عن الحلقة بدون عذر مسبق، فنرجو منكم إفادتنا بسبب غيابه",
+      "message": "السلام عليكم ورحمة الله وبركاته\n🚨🚨🚨🚨🚨\nالمكرم ولي أمر الطالب: amro\nنحيطكم علما بأن ابنكم قد تغيب اليوم الأحد الموافق 12 رمضان 1447هـ عن الحلقة بدون عذر مسبق، فنرجو منكم إفادتنا بسبب غيابه",
       "status": "sent",
-      "sentAt": "2026-02-28T02:02:08.461Z",
+      "sentAt": "2026-03-01T14:49:00.437Z",
       "error": ""
     },
     {
-      "id": "mm5oljzjhtcp",
+      "id": "mm7vewh1k1mq",
       "type": "scheduled",
-      "eventId": "mm5olhgvtrhq",
-      "date": "2026-03-14",
-      "studentName": "eff",
+      "eventId": "mm7veuescuuv",
+      "date": "2026-03-09",
+      "studentName": "0563997080",
       "phone": "0563997080",
-      "className": "cwq",
-      "message": "wcedsdcse25 رمضان 1447هـtyhrtgbrfbv",
+      "className": "www",
+      "message": "wwwwwww",
       "status": "scheduled",
       "fonnteIds": [
-        145619528
+        145832257
       ],
-      "sentAt": "2026-02-28T02:07:48.847Z",
-      "scheduledFor": "2026-03-14T09:00:00.000Z",
+      "sentAt": "2026-03-01T14:54:08.101Z",
+      "scheduledFor": "2026-03-09T06:00:00.000Z",
       "error": ""
     },
     {
-      "id": "mm5p0fshodmg",
-      "type": "absence",
-      "date": "2026-02-28",
-      "studentId": "mm53dstfazer",
-      "studentName": "hossam zain",
-      "phone": "0580408427",
-      "className": "حلقة الشيخ الغشيان",
-      "classId": "mm27mlol8n1i",
-      "message": "السلام عليكم ورحمة الله وبركاته\n🚨🚨🚨🚨🚨\nالمكرم ولي أمر الطالب: hossam zain\nنحيطكم علما بأن ابنكم قد تغيب اليوم السبت الموافق 11 رمضان 1447هـ عن الحلقة بدون عذر مسبق، فنرجو منكم إفادتنا بسبب غيابه",
-      "status": "sent",
-      "sentAt": "2026-02-28T02:19:23.249Z",
-      "error": ""
-    },
-    {
-      "id": "mm5ptyowyson",
-      "type": "absence",
-      "date": "2026-02-28",
-      "studentId": "mm3kqua22j0h",
-      "studentName": "amro",
+      "id": "mm7vexaoij6z",
+      "type": "scheduled",
+      "eventId": "mm7veues0jt6",
+      "date": "2026-03-10",
+      "studentName": "0563997080",
       "phone": "0563997080",
-      "className": "حلقة الشيخ آل فريان",
-      "classId": "mm27ot84jw17",
-      "message": "السلام عليكم ورحمة الله وبركاته\n🚨🚨🚨🚨🚨\nالمكرم ولي أمر الطالب: amro\nنحيطكم علما بأن ابنكم قد تغيب اليوم السبت الموافق 11 رمضان 1447هـ عن الحلقة بدون عذر مسبق، فنرجو منكم إفادتنا بسبب غيابه",
-      "status": "sent",
-      "sentAt": "2026-02-28T02:42:20.768Z",
+      "className": "www",
+      "message": "wwwwwww",
+      "status": "scheduled",
+      "fonnteIds": [
+        145832259
+      ],
+      "sentAt": "2026-03-01T14:54:09.168Z",
+      "scheduledFor": "2026-03-10T06:00:00.000Z",
       "error": ""
     },
     {
-      "id": "mm5ptzq8pt2m",
-      "type": "absence",
-      "date": "2026-02-28",
-      "studentId": "mm5ptfr39koe",
-      "studentName": "fdvfvds",
-      "phone": "0546343941",
-      "className": "حلقة الشيخ آل فريان",
-      "classId": "mm27ot84jw17",
-      "message": "السلام عليكم ورحمة الله وبركاته\n🚨🚨🚨🚨🚨\nالمكرم ولي أمر الطالب: fdvfvds\nنحيطكم علما بأن ابنكم قد تغيب اليوم السبت الموافق 11 رمضان 1447هـ عن الحلقة بدون عذر مسبق، فنرجو منكم إفادتنا بسبب غيابه",
-      "status": "sent",
-      "sentAt": "2026-02-28T02:42:22.112Z",
-      "error": ""
-    },
-    {
-      "id": "mm5pullwrbrf",
-      "type": "absence",
-      "date": "2026-02-28",
-      "studentId": "mm5ptfr39koe",
-      "studentName": "fdvfvds",
-      "phone": "0546343941",
-      "className": "حلقة الشيخ آل فريان",
-      "classId": "mm27ot84jw17",
-      "message": "السلام عليكم ورحمة الله وبركاته\n🚨🚨🚨🚨🚨\nالمكرم ولي أمر الطالب: fdvfvds\nنحيطكم علما بأن ابنكم قد تغيب اليوم السبت الموافق 11 رمضان 1447هـ عن الحلقة بدون عذر مسبق، فنرجو منكم إفادتنا بسبب غيابه",
-      "status": "sent",
-      "sentAt": "2026-02-28T02:42:50.468Z",
+      "id": "mm7veye19j28",
+      "type": "scheduled",
+      "eventId": "mm7veuesew3e",
+      "date": "2026-03-17",
+      "studentName": "0563997080",
+      "phone": "0563997080",
+      "className": "www",
+      "message": "wwwwwww",
+      "status": "scheduled",
+      "fonnteIds": [
+        145832260
+      ],
+      "sentAt": "2026-03-01T14:54:10.585Z",
+      "scheduledFor": "2026-03-17T06:00:00.000Z",
       "error": ""
     }
   ],
   "waDismissed": [],
-  "calendarEvents": [
-    {
-      "id": "mm5kdh12ef4o",
-      "title": "dddd",
-      "date": "2026-03-01",
-      "endDate": null,
-      "time": null,
-      "repeat": null,
-      "type": "event",
-      "note": "",
-      "color": "#2563EB",
-      "dailyRepeat": false,
-      "waMessage": null,
-      "waTargets": null,
-      "createdAt": "2026-02-28T00:09:33.301Z"
-    },
-    {
-      "id": "mm5ocibozpkm",
-      "title": "cwqwc",
-      "date": "2026-02-27",
-      "endDate": null,
-      "time": null,
-      "repeat": null,
-      "type": "event",
-      "note": "",
-      "color": "#2563EB",
-      "dailyRepeat": false,
-      "waMessage": null,
-      "waTargets": null,
-      "createdAt": "2026-02-28T02:00:46.787Z",
-      "fonnteScheduled": []
-    },
-    {
-      "id": "mm5olhgvtrhq",
-      "title": "cwq",
-      "date": "2026-03-14",
-      "endDate": null,
-      "time": null,
-      "repeat": null,
-      "type": "message",
-      "note": "wcq",
-      "color": "#7C3AED",
-      "dailyRepeat": false,
-      "waMessage": "wcedsdcse{التاريخ}tyhrtgbrfbv",
-      "waTargets": [
-        {
-          "name": "eff",
-          "phone": "0563997080"
-        }
-      ],
-      "createdAt": "2026-02-28T02:07:45.582Z",
-      "fonnteScheduled": [
-        {
-          "phone": "0563997080",
-          "fonnteId": "145619528"
-        }
-      ]
-    },
-    {
-      "id": "mm5ovo2rrvv1",
-      "title": "sd ffd v",
-      "date": "2026-02-18",
-      "endDate": null,
-      "time": null,
-      "repeat": null,
-      "type": "event",
-      "note": "sdvcsfdvsfcvs",
-      "color": "#2563EB",
-      "dailyRepeat": false,
-      "specificDates": null,
-      "waMessage": null,
-      "waTargets": null,
-      "createdAt": "2026-02-28T02:15:40.706Z",
-      "fonnteScheduled": []
-    }
-  ]
+  "calendarEvents": [],
+  "waQueue": [],
+  "notices": []
 }

@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<meta name="theme-color" content="#2D7D52" />
+<meta name="theme-color" content="#1E3A5F" />
+  <script>(function(){var t=localStorage.getItem('appTheme')||'light';var a=localStorage.getItem('appAccent')||'navy';document.documentElement.setAttribute('data-theme',t);document.documentElement.setAttribute('data-accent',a);})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <title>حضور الحلقات</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -63,36 +64,16 @@
         <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
       </svg>
     </button>
-    <span class="app-header-title" id="headerTitle">الرئيسية</span>
     <div class="header-brand">
       <div class="header-logos" id="headerLogos"></div>
     </div>
     <div class="header-right">
-      <button class="notif-bell-btn" id="notifBellBtn" onclick="toggleNotifPanel()" title="الإشعارات">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-        </svg>
-        <span class="notif-badge hidden" id="notifBadge">0</span>
-      </button>
-      <span class="date-badge" id="todayBadge"></span>
+      <span class="app-header-title" id="headerTitle">الرئيسية</span>
     </div>
+    <span class="date-badge" id="todayBadge" style="margin-right:auto"></span>
   </header>
 
-  <!-- Notification Panel -->
-  <div class="notif-overlay hidden" id="notifOverlay" onclick="closeNotifPanel()"></div>
-  <div class="notif-panel hidden" id="notifPanel">
-    <div class="notif-panel-header">
-      <span class="notif-panel-title">🔔 الإشعارات</span>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button class="notif-dismiss-all-btn" id="notifDismissAllBtn" onclick="dismissAllNotifs()">تجاهل الكل</button>
-        <button class="btn-icon" onclick="closeNotifPanel()">✕</button>
-      </div>
-    </div>
-    <div class="notif-panel-body" id="notifPanelBody">
-      <div class="notif-loading">⏳ جارٍ التحميل…</div>
-    </div>
-  </div>
+
 
   <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
 
@@ -267,8 +248,11 @@
         <button class="wa-tab" data-tab="groups" onclick="waShowTab('groups')">
           <span class="wa-tab-icon">👥</span> المجموعات
         </button>
-        <button class="wa-tab" data-tab="log"    onclick="waShowTab('log')">
+        <button class="wa-tab" data-tab="log"       onclick="waShowTab('log')">
           <span class="wa-tab-icon">🕐</span> السجل
+        </button>
+        <button class="wa-tab" data-tab="scheduled" onclick="waShowTab('scheduled')">
+          <span class="wa-tab-icon">📅</span> رسائل مجدولة
         </button>
       </div>
 
@@ -364,6 +348,15 @@
         </div>
         <div id="waLogList" class="wa-log-list"></div>
       </div>
+
+      <!-- ▸ تبويب: رسائل مجدولة -->
+      <div class="wa-tab-panel hidden" id="waTab-scheduled">
+        <div class="wa-sched-toolbar">
+          <p class="section-desc" style="margin:0;flex:1">رسائل واتساب مجدولة للإرسال في تواريخ محددة.</p>
+          <button class="btn-primary" onclick="waOpenNewScheduled()">➕ رسالة جديدة</button>
+        </div>
+        <div id="waSchedList" class="wa-sched-list"></div>
+      </div>
     </div>
 
     <!-- Modal: مجموعة واتساب -->
@@ -401,16 +394,26 @@
     <div class="page hidden" id="page-students">
       <div class="page-head">
         <h2>الطلاب</h2>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-secondary" id="studentBulkToggleBtn" onclick="studentToggleBulkMode()">☑ تحديد</button>
           <button class="btn-secondary" onclick="openBulkImportModal()">📥 استيراد Excel</button>
-          <button class="btn-primary" onclick="openStudentModal()">+ إضافة طالب</button>
-        </div>
+          <button class="btn-primary" onclick="openStudentModal()">+ إضافة طالب</button>        </div>
       </div>
       <div class="search-bar">
         <input type="text" id="studentSearch" placeholder="🔍 بحث عن طالب…" oninput="renderStudentList()" />
         <select id="studentClassFilter" onchange="renderStudentList()">
           <option value="">كل الحلقات</option>
         </select>
+      </div>
+      <!-- Bulk action bar (hidden by default) -->
+      <div class="bulk-bar hidden" id="studentBulkBar">
+        <span id="studentBulkCount" class="bulk-count">0 محدد</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-secondary" onclick="studentBulkSelectAll()">تحديد الكل</button>
+          <button class="btn-secondary" onclick="studentBulkClearAll()">إلغاء الكل</button>
+          <button class="btn-secondary" id="studentBulkPrintBtn" onclick="studentBulkPrint()" disabled>🖨️ طباعة المحدد</button>
+          <button class="btn-danger"    id="studentBulkDeleteBtn" onclick="studentBulkDelete()" disabled>🗑 حذف المحدد</button>
+        </div>
       </div>
       <div class="card-list" id="studentList"></div>
     </div>
@@ -591,8 +594,10 @@
           </div>
         </div>
         <div class="btn-row" style="flex-wrap:wrap;gap:8px">
-          <button class="btn-primary" onclick="downloadReport('daily-attendance')">📥 كشف الحضور Excel</button>
-          <button class="btn-secondary" onclick="downloadReport('teacher-log')">👨‍🏫 سجل المعلمين و الإداريين Excel</button>
+          <button class="btn-primary"   onclick="downloadReport('daily-attendance')">📥 كشف الحضور Excel</button>
+          <button class="btn-secondary" onclick="downloadReport('print-daily-attendance')">🖨️ طباعة كشف الحضور</button>
+          <button class="btn-secondary" onclick="downloadReport('teacher-log')">👨‍🏫 سجل المعلمين Excel</button>
+          <button class="btn-secondary" onclick="downloadReport('print-teacher-log')">🖨️ طباعة سجل المعلمين</button>
         </div>
       </div>
 
@@ -629,8 +634,10 @@
           </div>
         </div>
         <div class="btn-row" style="flex-wrap:wrap;gap:8px">
-          <button class="btn-primary" onclick="downloadReport('monthly')">📥 كشف شهري Excel</button>
-          <button class="btn-secondary" onclick="downloadReport('teacher-monthly-excel')">📊 Excel ساعات المعلمين و الإداريين</button>
+          <button class="btn-primary"   onclick="downloadReport('monthly')">📥 كشف شهري Excel</button>
+          <button class="btn-secondary" onclick="downloadReport('print-monthly')">🖨️ طباعة الكشف الشهري</button>
+          <button class="btn-secondary" onclick="downloadReport('teacher-monthly-excel')">📊 Excel ساعات المعلمين</button>
+          <button class="btn-secondary" onclick="downloadReport('print-teacher-monthly')">🖨️ طباعة ساعات المعلمين</button>
         </div>
       </div>
     </div>
@@ -796,6 +803,66 @@
         </div>
       </div>
 
+      <!-- تنسيق التاريخ -->
+      <div class="card form-card mt-md">
+        <h3 class="section-title">📅 تنسيق التاريخ في شريط العنوان</h3>
+        <p class="section-desc">اسحب العناصر لترتيبها، وفعّل أو عطّل كل عنصر بالضغط على المفتاح.</p>
+
+        <!-- Token list (rendered by JS) -->
+        <div id="dfTokenList" class="df-token-list"></div>
+
+        <!-- Separator picker -->
+        <div class="df-sep-row">
+          <span class="df-sep-lbl">الفاصل بين العناصر</span>
+          <div class="df-sep-options" id="dfSepOptions">
+            <button class="df-sep-btn active" data-sep=" "      onclick="dfPickSep(this)">مسافة</button>
+            <button class="df-sep-btn"        data-sep=" / "    onclick="dfPickSep(this)"> / </button>
+            <button class="df-sep-btn"        data-sep=" - "    onclick="dfPickSep(this)"> - </button>
+            <button class="df-sep-btn"        data-sep=" | "    onclick="dfPickSep(this)"> | </button>
+            <button class="df-sep-btn"        data-sep=" · "    onclick="dfPickSep(this)"> · </button>
+          </div>
+        </div>
+
+        <!-- Live preview -->
+        <div class="df-preview-row">
+          <span class="df-preview-lbl">معاينة:</span>
+          <span class="date-badge df-preview-badge" id="dfPreview"></span>
+        </div>
+
+        <div class="btn-row" style="margin-top:16px">
+          <button class="btn-secondary" onclick="dfReset()">↩ إعادة تعيين</button>
+          <button class="btn-primary"   onclick="saveDateFormat()">💾 حفظ التنسيق</button>
+        </div>
+        <p id="dfStatus" class="status-msg"></p>
+      </div>
+
+      <!-- الرمز السري -->
+      <div class="card form-card mt-md">
+        <h3 class="section-title">🎨 المظهر والألوان</h3>
+        <p class="section-desc">اختر الوضع المناسب لبيئة العمل واللون الرئيسي للتطبيق.</p>
+
+        <div class="theme-row">
+          <span class="theme-row-lbl">وضع العرض</span>
+          <div class="theme-mode-btns">
+            <button class="theme-mode-btn" id="themeBtnLight" onclick="setAppTheme('light')">☀️ فاتح</button>
+            <button class="theme-mode-btn" id="themeBtnDark"  onclick="setAppTheme('dark')">🌙 داكن</button>
+          </div>
+        </div>
+
+        <div class="theme-row" style="margin-top:16px">
+          <span class="theme-row-lbl">لون التمييز</span>
+          <div class="accent-swatches">
+            <button class="accent-swatch accent-navy"   data-accent="navy"   onclick="setAppAccent('navy')"   title="أزرق داكن احترافي"></button>
+            <button class="accent-swatch accent-teal"   data-accent="teal"   onclick="setAppAccent('teal')"   title="فيروزي"></button>
+            <button class="accent-swatch accent-emerald" data-accent="emerald" onclick="setAppAccent('emerald')" title="أخضر زمردي"></button>
+            <button class="accent-swatch accent-rose"   data-accent="rose"   onclick="setAppAccent('rose')"   title="وردي عميق"></button>
+            <button class="accent-swatch accent-amber"  data-accent="amber"  onclick="setAppAccent('amber')"  title="ذهبي عنبر"></button>
+            <button class="accent-swatch accent-slate"  data-accent="slate"  onclick="setAppAccent('slate')"  title="رمادي أردوازي"></button>
+          </div>
+        </div>
+        <p id="themeStatus" class="status-msg" style="margin-top:10px"></p>
+      </div>
+
       <!-- الرمز السري -->
       <div class="card form-card mt-md">
         <h3 class="section-title">🔒 الرمز السري</h3>
@@ -874,6 +941,153 @@
         </div>
         <p id="waSettStatus" class="status-msg"></p>
       </div>
+
+      <!-- ══ النسخ الاحتياطي والإعادة ══ -->
+      <div class="card form-card mt-md">
+        <h3 class="section-title">🗄 نسخ احتياطي وإعادة ضبط البيانات</h3>
+
+        <div class="reset-group">
+          <div class="reset-group-header">
+            <span class="reset-group-icon">💾</span>
+            <div>
+              <div class="reset-group-title">تنزيل نسخة احتياطية</div>
+              <div class="reset-group-desc">ملف JSON كامل — يحتوي على جميع البيانات ويمكن استيراده لاحقاً</div>
+            </div>
+          </div>
+          <button class="btn-primary" onclick="exportData()">📤 تنزيل النسخة الاحتياطية</button>
+        </div>
+
+        <div class="reset-divider"><span>إعادة ضبط — اختر ما تريد حذفه</span></div>
+
+        <div class="reset-warning-banner">
+          ⚠️ <strong>تحذير:</strong> الحذف نهائي ولا يمكن التراجع عنه. يُنصح بتنزيل نسخة احتياطية أولاً.
+        </div>
+
+        <div class="reset-options" id="resetOptions">
+
+          <label class="reset-option" id="ro-attendance">
+            <input type="checkbox" class="reset-cb" data-key="attendance" onchange="resetUpdateCount()" />
+            <div class="reset-option-body">
+              <div class="reset-option-icon">✅</div>
+              <div>
+                <div class="reset-option-title">سجل حضور الطلاب</div>
+                <div class="reset-option-sub">جميع سجلات الحضور + الأذونات + إشعارات الغياب</div>
+              </div>
+            </div>
+          </label>
+
+          <label class="reset-option" id="ro-teacherLog">
+            <input type="checkbox" class="reset-cb" data-key="teacherLog" onchange="resetUpdateCount()" />
+            <div class="reset-option-body">
+              <div class="reset-option-icon">⏱</div>
+              <div>
+                <div class="reset-option-title">حضور المعلمين والإداريين</div>
+                <div class="reset-option-sub">سجلات الدخول والخروج اليومية للمعلمين</div>
+              </div>
+            </div>
+          </label>
+
+          <label class="reset-option" id="ro-quran">
+            <input type="checkbox" class="reset-cb" data-key="quran" onchange="resetUpdateCount()" />
+            <div class="reset-option-body">
+              <div class="reset-option-icon">📖</div>
+              <div>
+                <div class="reset-option-title">تقدم القرآن الكريم</div>
+                <div class="reset-option-sub">جميع سجلات الحفظ والمراجعة للطلاب</div>
+              </div>
+            </div>
+          </label>
+
+          <label class="reset-option" id="ro-waLog">
+            <input type="checkbox" class="reset-cb" data-key="waLog" onchange="resetUpdateCount()" />
+            <div class="reset-option-body">
+              <div class="reset-option-icon">💬</div>
+              <div>
+                <div class="reset-option-title">سجل رسائل واتساب</div>
+                <div class="reset-option-sub">سجل الرسائل المُرسَلة وقائمة الانتظار</div>
+              </div>
+            </div>
+          </label>
+
+          <label class="reset-option" id="ro-calendar">
+            <input type="checkbox" class="reset-cb" data-key="calendar" onchange="resetUpdateCount()" />
+            <div class="reset-option-body">
+              <div class="reset-option-icon">🗓️</div>
+              <div>
+                <div class="reset-option-title">أحداث التقويم</div>
+                <div class="reset-option-sub">الأحداث والإجازات المجدولة في التقويم</div>
+              </div>
+            </div>
+          </label>
+
+          <label class="reset-option" id="ro-holidays">
+            <input type="checkbox" class="reset-cb" data-key="holidays" onchange="resetUpdateCount()" />
+            <div class="reset-option-body">
+              <div class="reset-option-icon">📅</div>
+              <div>
+                <div class="reset-option-title">الإجازات الرسمية</div>
+                <div class="reset-option-sub">قائمة الإجازات المُدخَلة يدوياً</div>
+              </div>
+            </div>
+          </label>
+
+          <label class="reset-option reset-option-danger" id="ro-students">
+            <input type="checkbox" class="reset-cb" data-key="students" onchange="resetUpdateCount()" />
+            <div class="reset-option-body">
+              <div class="reset-option-icon">👥</div>
+              <div>
+                <div class="reset-option-title">الطلاب</div>
+                <div class="reset-option-sub">حذف جميع الطلاب + حضورهم + الأذونات + تقدم القرآن</div>
+              </div>
+            </div>
+          </label>
+
+          <label class="reset-option reset-option-danger" id="ro-teachers">
+            <input type="checkbox" class="reset-cb" data-key="teachers" onchange="resetUpdateCount()" />
+            <div class="reset-option-body">
+              <div class="reset-option-icon">👨‍🏫</div>
+              <div>
+                <div class="reset-option-title">المعلمون</div>
+                <div class="reset-option-sub">حذف جميع المعلمين + سجلات حضورهم</div>
+              </div>
+            </div>
+          </label>
+
+          <label class="reset-option reset-option-danger" id="ro-classes">
+            <input type="checkbox" class="reset-cb" data-key="classes" onchange="resetUpdateCount()" />
+            <div class="reset-option-body">
+              <div class="reset-option-icon">🏫</div>
+              <div>
+                <div class="reset-option-title">الحلقات</div>
+                <div class="reset-option-sub">حذف جميع الحلقات (الطلاب يبقون بدون حلقة)</div>
+              </div>
+            </div>
+          </label>
+
+        </div>
+
+        <div class="reset-action-row">
+          <span id="resetSelCount" class="reset-sel-count"></span>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <button class="btn-secondary" onclick="resetSelectAll()">تحديد الكل</button>
+            <button class="btn-secondary" onclick="resetClearAll()">إلغاء الكل</button>
+            <button class="btn-danger" id="resetConfirmBtn" onclick="openResetConfirmModal()" disabled>
+              🗑 حذف المحدد
+            </button>
+          </div>
+        </div>
+
+        <div class="reset-factory-row">
+          <div>
+            <div style="font-weight:700;font-size:13px;color:#dc2626">⚠️ إعادة ضبط كاملة (Factory Reset)</div>
+            <div style="font-size:12px;color:var(--text2);margin-top:3px">حذف كل شيء: الطلاب، المعلمون، الحلقات، الحضور، التقويم، الرسائل.<br>يبقى فقط: اسم المنشأة، الشعارات، الرمز السري، إعدادات واتساب.</div>
+          </div>
+          <button class="btn-danger" style="flex-shrink:0" onclick="openFullResetModal()">💥 إعادة ضبط كاملة</button>
+        </div>
+
+        <p id="resetStatus" class="status-msg"></p>
+      </div>
+
     </div>
 
   </main>
@@ -914,13 +1128,16 @@
     <div class="modal-body">
       <input type="hidden" id="calEventId" />
 
-      <div class="form-group">
+      <!-- Shown only when opened from WA tab -->
+      <div id="calWaModeBanner" class="cal-wa-mode-banner hidden">
+        💬 رسالة واتساب مجدولة
+      </div>
+      <div class="form-group" id="calTypeSection">
         <label>نوع الحدث *</label>
         <div class="cal-type-grid" id="calTypeGrid">
           <button type="button" class="cal-type-btn active" data-type="event"    onclick="calSelectType('event')">📌 حدث</button>
           <button type="button" class="cal-type-btn"        data-type="holiday"  onclick="calSelectType('holiday')">🏖️ إجازة رسمية</button>
           <button type="button" class="cal-type-btn"        data-type="offday"   onclick="calSelectType('offday')">📴 يوم إجازة</button>
-          <button type="button" class="cal-type-btn"        data-type="message"  onclick="calSelectType('message')">💬 رسالة مجدولة</button>
           <button type="button" class="cal-type-btn"        data-type="reminder" onclick="calSelectType('reminder')">🔔 تذكير</button>
         </div>
       </div>
@@ -946,21 +1163,7 @@
       <div class="form-row">
         <div class="form-group">
           <label>الوقت</label>
-          <input type="time" id="calEventTime" oninput="calSyncTimePicker()" onchange="calSyncTimePicker()" style="margin-bottom:8px"/>
-          <div class="time-quick-grid" id="timeQuickGrid">
-            <button type="button" class="time-quick-btn" onclick="calSetTime('07:00')">7:00 ص</button>
-            <button type="button" class="time-quick-btn" onclick="calSetTime('08:00')">8:00 ص</button>
-            <button type="button" class="time-quick-btn" onclick="calSetTime('09:00')">9:00 ص</button>
-            <button type="button" class="time-quick-btn" onclick="calSetTime('10:00')">10:00 ص</button>
-            <button type="button" class="time-quick-btn" onclick="calSetTime('12:00')">12:00 م</button>
-            <button type="button" class="time-quick-btn" onclick="calSetTime('14:00')">2:00 م</button>
-            <button type="button" class="time-quick-btn" onclick="calSetTime('16:00')">4:00 م</button>
-            <button type="button" class="time-quick-btn" onclick="calSetTime('18:00')">6:00 م</button>
-            <button type="button" class="time-quick-btn" onclick="calSetTime('19:00')">7:00 م</button>
-            <button type="button" class="time-quick-btn" onclick="calSetTime('20:00')">8:00 م</button>
-            <button type="button" class="time-quick-btn" onclick="calSetTime('21:00')">9:00 م</button>
-            <button type="button" class="time-quick-btn" onclick="calSetTime('22:00')">10:00 م</button>
-          </div>
+          <input type="time" id="calEventTime" />
         </div>
         <div class="form-group">
           <label>تكرار</label>
@@ -1212,6 +1415,38 @@
 </div>
 
 <!-- نافذة تفاصيل الطالب -->
+<!-- نافذة تعهد / إنذار -->
+<div class="modal-overlay hidden" id="noticeModal" style="z-index:600">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3>📋 تسجيل تعهد / إنذار</h3>
+      <button class="btn-icon" onclick="closeModal('noticeModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>النوع</label>
+        <select id="noticeType">
+          <option value="تعهد">تعهد</option>
+          <option value="إنذار">إنذار</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>التاريخ</label>
+        <input type="date" id="noticeDate" onchange="updateHijriLabel(this,'noticeHijri')" />
+        <span class="hijri-label" id="noticeHijri"></span>
+      </div>
+      <div class="form-group">
+        <label>السبب / الملاحظات</label>
+        <textarea id="noticeReason" rows="3" placeholder="اكتب سبب التعهد أو الإنذار…" style="resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('noticeModal')">إلغاء</button>
+      <button class="btn-primary" onclick="saveNotice()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay hidden" id="studentDetailModal">
   <div class="modal modal-lg">
     <div class="modal-header">
@@ -1328,6 +1563,55 @@
 </div>
 
 <div class="toast hidden" id="toast"></div>
+
+<!-- نافذة تأكيد الحذف المحدد -->
+<div class="modal-overlay hidden" id="resetConfirmModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3 style="color:#dc2626">🗑 تأكيد الحذف</h3>
+      <button class="btn-icon" onclick="closeModal('resetConfirmModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:14px;margin-bottom:12px">ستُحذَف البيانات التالية نهائياً ولا يمكن التراجع عنها:</p>
+      <div id="resetConfirmList" style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:12px 16px;font-size:13px;line-height:2"></div>
+      <p style="margin-top:14px;font-size:13px;color:#dc2626;font-weight:600">هل أنت متأكد؟ هذا الإجراء لا يمكن التراجع عنه.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('resetConfirmModal')">إلغاء</button>
+      <button class="btn-danger" onclick="executeReset()">🗑 نعم، احذف</button>
+    </div>
+  </div>
+</div>
+
+<!-- نافذة تأكيد الإعادة الكاملة -->
+<div class="modal-overlay hidden" id="fullResetModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h3 style="color:#dc2626">💥 إعادة ضبط كاملة</h3>
+      <button class="btn-icon" onclick="closeModal('fullResetModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:14px;margin-bottom:14px;font-size:13px;line-height:1.9">
+        <strong>سيتم حذف كل ما يلي نهائياً:</strong><br>
+        👥 جميع الطلاب &nbsp;·&nbsp; 👨‍🏫 جميع المعلمين &nbsp;·&nbsp; 🏫 جميع الحلقات<br>
+        ✅ سجلات الحضور &nbsp;·&nbsp; 📖 تقدم القرآن &nbsp;·&nbsp; 🗓️ التقويم<br>
+        💬 رسائل واتساب &nbsp;·&nbsp; 📅 الإجازات
+      </div>
+      <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:10px 14px;font-size:12px;color:#166534">
+        ✅ يبقى: اسم المنشأة، الشعارات، الرمز السري، إعدادات واتساب
+      </div>
+      <div style="margin-top:16px">
+        <label style="font-size:13px;font-weight:600;color:#dc2626">اكتب <strong>حذف</strong> للتأكيد:</label>
+        <input type="text" id="fullResetConfirmInput" placeholder='اكتب "حذف" هنا'
+          style="margin-top:6px;width:100%;padding:10px 12px;border:1.5px solid #fca5a5;border-radius:8px;font-size:14px;font-family:inherit" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('fullResetModal')">إلغاء</button>
+      <button class="btn-danger" onclick="executeFullReset()">💥 إعادة الضبط الكاملة</button>
+    </div>
+  </div>
+</div>
 
 <!-- نافذة ملف المعلم -->
 <div class="modal-overlay hidden" id="teacherProfileModal">
@@ -1550,5 +1834,62 @@
   </div>
 </div>
 
+<!-- Attendance Edit Modal -->
+<div class="modal-overlay hidden" id="attEditModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h3>✏️ تعديل الحضور</h3>
+      <button class="btn-icon" onclick="closeAttEditModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-weight:700;font-size:15px;margin-bottom:4px" id="attEditStudentName"></div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:16px" id="attEditDate"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+        <button class="att-edit-status-btn" data-status="Present" onclick="attEditSelectStatus(this)" style="padding:12px;border-radius:10px;border:1.5px solid #86EFAC;background:#F0FDF4;color:var(--success);font-weight:700;font-size:14px;cursor:pointer">✅ حاضر</button>
+        <button class="att-edit-status-btn" data-status="Late"    onclick="attEditSelectStatus(this)" style="padding:12px;border-radius:10px;border:1.5px solid #FCD34D;background:#FFFBEB;color:var(--warn);font-weight:700;font-size:14px;cursor:pointer">⏱ متأخر</button>
+        <button class="att-edit-status-btn" data-status="Absent"  onclick="attEditSelectStatus(this)" style="padding:12px;border-radius:10px;border:1.5px solid #FCA5A5;background:#FFF5F5;color:var(--error);font-weight:700;font-size:14px;cursor:pointer">❌ غائب</button>
+        <button class="att-edit-status-btn" data-status="Excused" onclick="attEditSelectStatus(this)" style="padding:12px;border-radius:10px;border:1.5px solid #C4B5FD;background:var(--purple-light);color:var(--purple);font-weight:700;font-size:14px;cursor:pointer">🏥 بعذر</button>
+      </div>
+      <div class="form-group">
+        <label>ملاحظات</label>
+        <input type="text" id="attEditNotes" placeholder="ملاحظات اختيارية…" />
+      </div>
+      <div id="attEditResult" class="sp-qa-result hidden"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeAttEditModal()">إلغاء</button>
+      <button class="btn-primary" onclick="saveAttEdit()">💾 حفظ التعديل</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Theme & Accent System ──────────────────────────────
+function setAppTheme(mode) {
+  document.documentElement.setAttribute('data-theme', mode);
+  localStorage.setItem('appTheme', mode);
+  document.getElementById('themeBtnLight').classList.toggle('active', mode === 'light');
+  document.getElementById('themeBtnDark').classList.toggle('active', mode === 'dark');
+  var s = document.getElementById('themeStatus');
+  if (s) { s.textContent = mode === 'dark' ? '🌙 تم تفعيل الوضع الداكن' : '☀️ تم تفعيل الوضع الفاتح'; setTimeout(function(){s.textContent='';}, 2000); }
+}
+function setAppAccent(accent) {
+  document.documentElement.setAttribute('data-accent', accent);
+  localStorage.setItem('appAccent', accent);
+  document.querySelectorAll('.accent-swatch').forEach(function(b){ b.classList.toggle('active', b.dataset.accent === accent); });
+  var s = document.getElementById('themeStatus');
+  if (s) { s.textContent = '✅ تم تغيير اللون'; setTimeout(function(){s.textContent='';}, 2000); }
+}
+function initThemeUI() {
+  var mode = localStorage.getItem('appTheme') || 'light';
+  var accent = localStorage.getItem('appAccent') || 'navy';
+  var bl = document.getElementById('themeBtnLight');
+  var bd = document.getElementById('themeBtnDark');
+  if (bl) bl.classList.toggle('active', mode === 'light');
+  if (bd) bd.classList.toggle('active', mode === 'dark');
+  document.querySelectorAll('.accent-swatch').forEach(function(b){ b.classList.toggle('active', b.dataset.accent === accent); });
+}
+document.addEventListener('DOMContentLoaded', initThemeUI);
+</script>
 </body>
 </html>
