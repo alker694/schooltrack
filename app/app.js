@@ -153,6 +153,23 @@ document.addEventListener('DOMContentLoaded', () => {
   loadAndDisplayLogos(); // عرض الشعارات قبل الدخول
   loadPinQR();           // تحميل QR عند كل تحميل للصفحة
 
+  // ── Logo Home Button Ripple ──────────────────────────
+  (function() {
+    const brand = document.querySelector('.header-brand');
+    if (!brand) return;
+    brand.addEventListener('click', function(e) {
+      const rect = brand.getBoundingClientRect();
+      const size = Math.max(rect.width, rect.height) * 1.4;
+      const x = e.clientX - rect.left - size / 2;
+      const y = e.clientY - rect.top  - size / 2;
+      const ripple = document.createElement('span');
+      ripple.className = 'logo-ripple';
+      ripple.style.cssText = `width:${size}px;height:${size}px;left:${x}px;top:${y}px`;
+      brand.appendChild(ripple);
+      ripple.addEventListener('animationend', () => ripple.remove());
+    });
+  })();
+
   // ── Keyboard PIN entry (desktop only — real keyboard) ────
   document.addEventListener('keydown', (e) => {
     const pinScreen = document.getElementById('pinScreen');
@@ -196,6 +213,7 @@ async function pinSubmit() {
   });
   const data = await res.json();
   if (data.valid) {
+    sessionStorage.setItem('halaqat_auth', '1');
     document.getElementById('pinScreen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     await loadAll(); await loadAndDisplayLogos(); navigate('dashboard');
@@ -326,6 +344,7 @@ async function pinSubmit() {
   }
 }
 function lockApp() {
+  sessionStorage.removeItem('halaqat_auth');
   pinBuffer = ''; updatePinDots();
   document.getElementById('pinError').textContent = '';
   document.getElementById('pinScreen').classList.remove('hidden');
@@ -428,7 +447,41 @@ function _setFavicon(url) {
 // ══════════════════════════════════════════════════════════
 //  التنقل
 // ══════════════════════════════════════════════════════════
+// ── Browser History Navigation (pushState / popState) ──────────
+let _navByHistory = false;
+
+window.addEventListener('popstate', function(e) {
+  const page = e.state && e.state.page ? e.state.page : 'dashboard';
+  _navByHistory = true;
+  navigate(page);
+});
+
+// ── Skeleton helpers ───────────────────────────────────
+function showSkeleton(page) {
+  const sk = document.getElementById(`skel-${page}`);
+  if (sk) sk.classList.remove('hidden');
+}
+function hideSkeleton(page) {
+  const sk = document.getElementById(`skel-${page}`);
+  if (!sk) return;
+  sk.style.opacity = '1';
+  sk.style.transition = 'opacity 0.22s ease';
+  requestAnimationFrame(() => {
+    sk.style.opacity = '0';
+    setTimeout(() => { sk.classList.add('hidden'); sk.style.opacity = ''; sk.style.transition = ''; }, 230);
+  });
+}
+
 async function navigate(page) {
+  // Push to browser history (skip when triggered by popstate)
+  if (!_navByHistory) {
+    const currentState = history.state && history.state.page;
+    if (currentState !== page) {
+      history.pushState({ page }, '', `?page=${page}`);
+    }
+  }
+  _navByHistory = false;
+
   state.currentPage = page; closeSidebar();
   // Hide attendance sticky bar when leaving that page
   if (page !== 'attendance') {
@@ -447,6 +500,10 @@ async function navigate(page) {
   document.getElementById('headerTitle').textContent = titles[page] || page;
   document.querySelectorAll('.nav-item, .bnav-item').forEach(el =>
     el.classList.toggle('active', el.dataset.page === page));
+
+  // Show skeleton immediately
+  showSkeleton(page);
+
   await loadAll();
   switch(page) {
     case 'dashboard':  renderDashboard();   break;
@@ -463,6 +520,9 @@ async function navigate(page) {
     case 'sync':       initSyncPage();      break;
     case 'calendar':   initCalendarPage();  break;
   }
+
+  // Hide skeleton after render (slight delay so content paints first)
+  setTimeout(() => hideSkeleton(page), 120);
 }
 
 function toggleSidebar() {
@@ -2949,6 +3009,23 @@ function exportData() {
 
 async function initSyncPage() {
   await checkExeStatus();
+  // Load Telegram settings
+  const s = await apiFetch('/settings');
+  if (s) {
+    const tgBot  = document.getElementById('settTgBotToken');
+    const tgChat = document.getElementById('settTgChatId');
+    if (tgBot)  tgBot.value  = s.telegramBotToken || '';
+    if (tgChat) tgChat.value = s.telegramChatId   || '';
+  }
+  syncShowTab('network');
+}
+
+function syncShowTab(tab) {
+  document.querySelectorAll('.sync-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.sync-tab-panel').forEach(p => p.classList.add('hidden'));
+  const el = document.getElementById('syncTab-' + tab);
+  if (el) el.classList.remove('hidden');
 }
 
 async function checkExeStatus() {
@@ -3038,11 +3115,7 @@ async function initSettings() {
   if (schoolName) schoolName.value = s.schoolName || '';
   if (subtitle)   subtitle.value   = s.subtitle   || '';
 
-  // Telegram
-  const tgBot  = document.getElementById('settTgBotToken');
-  const tgChat = document.getElementById('settTgChatId');
-  if (tgBot)  tgBot.value  = s.telegramBotToken || '';
-  if (tgChat) tgChat.value = s.telegramChatId   || '';
+  // Telegram (now on sync page — skipped here)
 
   // WhatsApp
   const waKey      = document.getElementById('settWaApiKey');
@@ -3638,6 +3711,20 @@ function waShowTab(tab) {
     t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.wa-tab-panel').forEach(p => p.classList.add('hidden'));
   document.getElementById(`waTab-${tab}`)?.classList.remove('hidden');
+  // Load WA settings data when settings tab is opened
+  if (tab === 'wasettings') { _loadWaSettingsTab(); }
+}
+
+async function _loadWaSettingsTab() {
+  const s = await apiFetch('/settings');
+  if (!s) return;
+  const waKey      = document.getElementById('settWaApiKey');
+  const waPhone    = document.getElementById('settAdminPhone');
+  const waTemplate = document.getElementById('settWaTemplate');
+  if (waKey)      waKey.value      = s.whatsappApiKey   || '';
+  if (waPhone)    waPhone.value    = s.adminPhone        || '';
+  if (waTemplate) waTemplate.value = s.whatsappTemplate || '';
+  renderWaTemplateList();
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -6926,3 +7013,150 @@ function fonnteShowDeviceCard(connected, dev) {
     }
   }
 }
+
+// ══════════════════════════════════════════════════════════════════
+//  تهيئة Lucide Icons + Pull-to-Refresh
+// ══════════════════════════════════════════════════════════════════
+function _initLucideIcons() {
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+}
+
+function _initPullToRefresh() {
+  // Completely custom PTR — no library.
+  // The ONLY way to reliably prevent mid-scroll triggers is to gate everything
+  // at touchstart: if scrollY > 0 at that exact moment, the whole gesture is dead.
+
+  var THRESHOLD = 64;   // px of pull needed to trigger
+  var MAX_DIST  = 80;   // px max visual pull
+  var MIN_DEG   = 55;   // min angle from horizontal to count as a downward pull
+
+  // Build indicator using the same class names the library used (keeps your CSS)
+  var bar = document.createElement('div');
+  bar.className = 'ptr--ptr';
+  var SVG_ARROW = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="7 10 12 15 17 10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+  var SVG_SPIN  = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="ptr-spin"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
+  bar.innerHTML = '<div class="ptr--text"><span class="ptr--icon">' + SVG_ARROW + '</span><span class="ptr--msg">اسحب للتحديث</span></div>';
+  document.body.insertBefore(bar, document.body.firstChild);
+
+  var iconEl = bar.querySelector('.ptr--icon');
+  var msgEl  = bar.querySelector('.ptr--msg');
+
+  // The actual scrolling element is .page-container, NOT window.
+  // window.scrollY is always 0 — that's why all previous gates failed.
+  var scroller = document.querySelector('.page-container') || document.body;
+
+  var active     = false;
+  var refreshing = false;
+  var startY = 0, startX = 0;
+  var angleLocked = false;
+  var angleOk     = false;
+
+  function scrollTop() {
+    return scroller.scrollTop;
+  }
+
+  function setHeight(h) {
+    bar.style.height = h + 'px';
+  }
+
+  function setReady(yes) {
+    iconEl.style.transform = yes ? 'rotate(180deg)' : 'rotate(0deg)';
+    msgEl.textContent = yes ? 'أطلق للتحديث' : 'اسحب للتحديث';
+  }
+
+  function reset() {
+    bar.style.transition = 'height 0.25s cubic-bezier(0.22,1,0.36,1)';
+    setHeight(0);
+    setTimeout(function() {
+      bar.style.transition = '';
+      iconEl.innerHTML = SVG_ARROW;
+      iconEl.style.transform = '';
+      msgEl.textContent = 'اسحب للتحديث';
+    }, 260);
+    active = false; angleLocked = false; angleOk = false; startY = 0;
+  }
+
+  function doRefresh() {
+    refreshing = true;
+    iconEl.innerHTML = SVG_SPIN;
+    iconEl.style.transform = '';
+    msgEl.textContent = 'جارٍ التحديث…';
+    setHeight(MAX_DIST);
+    var page = (typeof state !== 'undefined' && state.currentPage) ? state.currentPage : 'dashboard';
+    Promise.resolve(navigate(page)).finally(function() {
+      setTimeout(function() { reset(); refreshing = false; }, 300);
+    });
+  }
+
+  // Attach to the scroller, not document — so we read the right element's position
+  scroller.addEventListener('touchstart', function(e) {
+    if (refreshing) return;
+    if (e.touches.length > 1) return;
+    // ── THE REAL GATE: scroller must be at top when finger lands ──
+    if (scrollTop() > 0) return;
+    startY = e.touches[0].clientY;
+    startX = e.touches[0].clientX;
+    angleLocked = false;
+    angleOk     = false;
+    active      = false;
+  }, { passive: true });
+
+  scroller.addEventListener('touchmove', function(e) {
+    if (refreshing || startY === 0) return;
+
+    var dy = e.touches[0].clientY - startY;
+    var dx = e.touches[0].clientX - startX;
+
+    // Dragging upward or scroller scrolled down — kill gesture
+    if (dy <= 0 || scrollTop() > 0) { reset(); return; }
+
+    // One-time angle check
+    if (!angleLocked && (Math.abs(dy) + Math.abs(dx)) > 6) {
+      angleLocked = true;
+      angleOk = Math.atan2(Math.abs(dy), Math.abs(dx)) * (180 / Math.PI) >= MIN_DEG;
+      if (!angleOk) { reset(); return; }
+    }
+    if (!angleLocked) return;
+
+    active = true;
+    var pull = Math.min(dy * 0.5, MAX_DIST);
+    setHeight(pull);
+    setReady(pull >= THRESHOLD * 0.5);
+  }, { passive: true });
+
+  scroller.addEventListener('touchend', function(e) {
+    if (!active) { startY = 0; return; }
+    var dy   = e.changedTouches[0].clientY - startY;
+    var pull = Math.min(dy * 0.5, MAX_DIST);
+    if (pull >= THRESHOLD * 0.5) { doRefresh(); } else { reset(); }
+  }, { passive: true });
+
+  scroller.addEventListener('touchcancel', function() { reset(); }, { passive: true });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  _initLucideIcons();
+  _initPullToRefresh();
+  // On initial load, check URL for page param
+  const urlPage = new URLSearchParams(location.search).get('page');
+  if (urlPage) {
+    history.replaceState({ page: urlPage }, '', '?page=' + urlPage);
+  } else {
+    history.replaceState({ page: 'dashboard' }, '', location.href);
+  }
+
+  // ── Session restore: skip PIN if already authenticated this session ──
+  if (sessionStorage.getItem('halaqat_auth') === '1') {
+    document.getElementById('pinScreen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    loadAll().then(function() {
+      loadAndDisplayLogos();
+      const page = urlPage || 'dashboard';
+      navigate(page);
+      refreshNotifBadge();
+      waUpdateNavBadge();
+    });
+  }
+});
