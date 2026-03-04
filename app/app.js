@@ -501,28 +501,38 @@ async function navigate(page) {
   document.querySelectorAll('.nav-item, .bnav-item').forEach(el =>
     el.classList.toggle('active', el.dataset.page === page));
 
-  // Show skeleton immediately
-  showSkeleton(page);
+  // Only show skeleton if loading takes longer than 180 ms.
+  // For instant / cached renders the skeleton never appears at all.
+  let _skelShown = false;
+  const _skelTimer = setTimeout(() => {
+    showSkeleton(page);
+    _skelShown = true;
+  }, 180);
 
-  await loadAll();
-  switch(page) {
-    case 'dashboard':  renderDashboard();   break;
-    case 'attendance': initAttendance();    break;
-    case 'whatsapp':   initWhatsappPage();  break;
-    case 'students':   renderStudentList(); break;
-    case 'quran':      initQuranPage();     break;
-    case 'classes':    renderClassList();   break;
-    case 'teachers':   renderTeacherList(); break;
-    case 'checkin':    renderCheckinList(); loadTeacherSummary(); break;
-    case 'holidays':   renderHolidayList(); break;
-    case 'reports':    initReports();       break;
-    case 'settings':   initSettings();      break;
-    case 'sync':       initSyncPage();      break;
-    case 'calendar':   initCalendarPage();  break;
+  try {
+    await loadAll();
+    switch(page) {
+      case 'dashboard':  await renderDashboard();   break;
+      case 'attendance': initAttendance();           break;
+      case 'whatsapp':   await initWhatsappPage();  break;
+      case 'students':   renderStudentList();        break;
+      case 'quran':      await initQuranPage();     break;
+      case 'classes':    renderClassList();          break;
+      case 'teachers':   renderTeacherList();        break;
+      case 'checkin':    renderCheckinList(); loadTeacherSummary(); break;
+      case 'holidays':   renderHolidayList();        break;
+      case 'reports':    initReports();              break;
+      case 'settings':   await initSettings();      break;
+      case 'sync':       await initSyncPage();      break;
+      case 'calendar':   await initCalendarPage();  break;
+    }
+  } finally {
+    clearTimeout(_skelTimer);
+    if (_skelShown) {
+      // Give the browser one frame to paint content before fading the skeleton
+      setTimeout(() => hideSkeleton(page), 80);
+    }
   }
-
-  // Hide skeleton after render (slight delay so content paints first)
-  setTimeout(() => hideSkeleton(page), 120);
 }
 
 function toggleSidebar() {
